@@ -27,7 +27,8 @@ $sourceDirs = @(
 $extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx")
 
 # Define ignored subdirectories (without leading slash)
-$ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules")
+$ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules", ".devcontainer",
+                 "_Container", "_SBOM", "_Scripts")
 
 # Define mapping output file
 $mappingFile = Join-Path $workspaceDir "file-mapping.json"
@@ -259,12 +260,54 @@ foreach ($sourceDir in $sourceDirs) {
 
 # Handle scan mode results
 if ($Scan) {
+    # Write mapping to JSON file in scan mode
+    $mappingJson = $mapping | ConvertTo-Json -Depth 10
+    Set-Content -Path $mappingFile -Value $mappingJson -Encoding UTF8
+    
+    # Scan local workspace for available documents
+    Write-Host "`nScanning local workspace for available documents..." -ForegroundColor Cyan
+    $availableDocuments = @{}
+    $localSourceDirs = @("TL2", "TL2_dotnet", "TLCloud")
+    
+    foreach ($localDir in $localSourceDirs) {
+        $localPath = Join-Path $workspaceDir $localDir
+        if (Test-Path $localPath) {
+            foreach ($ext in $extensions) {
+                $localFiles = Get-ChildItem -Path $localPath -Filter $ext -Recurse -File -ErrorAction SilentlyContinue
+                
+                foreach ($localFile in $localFiles) {
+                    $relPath = $localFile.FullName.Substring($localPath.Length + 1)
+                    $relPathNormalized = $relPath -replace '\\', '/'
+                    $docPath = "$localDir/$relPathNormalized"
+                    $workspaceRelPath = $localFile.FullName.Substring($workspaceDir.Length + 1) -replace '\\', '/'
+                    
+                    $availableDocuments[$docPath] = @{
+                        fullPath = $localFile.FullName
+                        workspaceRelativePath = $workspaceRelPath
+                        repository = $localDir
+                        relativePath = $relPathNormalized
+                        lastModified = $localFile.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+                        size = $localFile.Length
+                    }
+                }
+            }
+        }
+    }
+    
+    # Write available documents to JSON
+    $availableDocsFile = Join-Path $workspaceDir "documents-available.json"
+    $availableDocsJson = $availableDocuments | ConvertTo-Json -Depth 10
+    Set-Content -Path $availableDocsFile -Value $availableDocsJson -Encoding UTF8
+    
     Write-Host "`n========================================" -ForegroundColor Cyan
     Write-Host "Scan completed!" -ForegroundColor Cyan
     Write-Host "Total files scanned: $($mapping.Count)" -ForegroundColor Cyan
     Write-Host "New files: $totalNew" -ForegroundColor Green
     Write-Host "Updated files: $totalUpdated" -ForegroundColor Yellow
     Write-Host "Skipped files: $totalSkipped" -ForegroundColor Gray
+    Write-Host "Available documents in workspace: $($availableDocuments.Count)" -ForegroundColor Cyan
+    Write-Host "Mapping file updated: $mappingFile" -ForegroundColor Cyan
+    Write-Host "Available docs file: $availableDocsFile" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     
     if ($totalNew -gt 0 -or $totalUpdated -gt 0) {

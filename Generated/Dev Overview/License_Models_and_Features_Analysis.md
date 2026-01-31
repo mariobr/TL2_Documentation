@@ -1,42 +1,11 @@
-<!--
-DOCUMENT GENERATION PROMPT:
-"Analyze all documents and create a markdown document with all information about license models and features"
 
-TO UPDATE THIS DOCUMENT:
-1. Run: .\copy-documents.ps1 (to copy latest files from TL2, TL2_dotnet, TLCloud)
-2. Run: .\generate-file-mapping.ps1 (to generate file-mapping.json with source references)
-3. Use this prompt:
-   "Using the file-mapping.json for source references, analyze all documents in the input folder and update 
-   the License_Models_and_Features_Analysis.md with all information about:
-   - License models (types, features, capabilities)
-   - Features (properties, organization, structure)
-   - Subscription models, pricing, product SKUs/editions, license tiers
-   - Feature limitations and restrictions
-   - License management capabilities and APIs
-   - Client-side licensing architecture, provisioning, and technical capabilities
-   
-   IMPORTANT: Reference sources using relative paths from originalPath in file-mapping.json.
-   Format: **Source:** [filename.md](../Repository/path/to/file.md "Repository/path/to")
-   - Link text displays filename only
-   - Link target is full relative path
-   - Title attribute (hover tooltip) shows directory path
-   Do NOT use http:// or https:// links. Use filesystem relative paths only.
-   
-   Include detailed technical information, code examples, and always cite sources with relative paths.
-   Update the timestamp to current date/time in English format with 24h time: 
-   [System.Globalization.CultureInfo]::CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('en-US'); Get-Date -Format "dd MMMM yyyy HH:mm""
-
-File mapping: See file-mapping.json for complete source-to-destination mapping
-Files analyzed: 56 files from TL2, TL2_dotnet, and TLCloud repositories
-Excluded: vcpkg_installed and out directories
--->
 
 # Trusted Licensing 365 - License Models and Features Analysis
 
 **Generated:** January 28, 2026  
-**Last Updated:** 28 January 2026 14:46  
+**Last Updated:** 31 January 2026 13:43  
 **Source:** Consolidated documentation from TL2, TL2_dotnet, and TLCloud repositories
-**Files Analyzed:** 56 files copied (9 skipped from vcpkg_installed and out directories)
+**Files Analyzed:** 56 documents referenced via documents-available.json
 
 ---
 
@@ -64,7 +33,7 @@ The platform supports multiple license model types that vendors can use to creat
 - **Description:** Feature valid forever with no expiration
 - **Use Case:** Traditional software licensing
 - **Persistence:** Not required
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 1.2 Time-Based Models (Persistence Required)
 
@@ -75,19 +44,19 @@ The platform supports multiple license model types that vendors can use to creat
   - Time validation configured via tolerance in minutes
   - Validation via TPM or Persistence layer
 - **Use Case:** Subscription software, rental models
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 #### Trial (First Use)
 - **Description:** Feature valid when first consumed for a specified number of days
 - **Behavior:** After first usage, behaves like Time Period model
 - **Use Case:** Software trial periods, evaluation licenses
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 #### Trial (Consumption Based)
 - **Description:** Offers an amount of time that decrements during license consumption
 - **Operations:** Login and Logoff events decrement available time
 - **Use Case:** Time-limited trials, pay-per-use scenarios
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 1.3 Counter-Based Models (Persistence Required)
 
@@ -95,13 +64,13 @@ The platform supports multiple license model types that vendors can use to creat
 - **Description:** Each feature consumption decrements counter by specified amount
 - **Invalidation:** License invalidates when counter reaches 0
 - **Use Case:** Limited-use scenarios, metered licensing
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 #### Counter Based - Increment
 - **Description:** Counter increments with or without limit on each consumption
 - **Reset Process:** Ensures counter reset to zero with guaranteed reporting to License Management System
 - **Use Case:** Usage tracking, audit trail requirements
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 1.4 Token-Based Models (Persistence Required)
 
@@ -114,7 +83,7 @@ The platform supports multiple license model types that vendors can use to creat
   - **Revocable:** Exportable tokens can be returned to License Management System
   - **Trading:** Capability for token exchange between entities
 - **Use Case:** Cloud computing credits, API call limits, shared resource pools
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 1.5 Activation-Dependent Models
 
@@ -122,7 +91,7 @@ The platform supports multiple license model types that vendors can use to creat
 - **Description:** Feature time period set at activation time
 - **Behavior:** After activation, behaves like standard Time Period model
 - **Use Case:** Maintenance contracts, annual renewals
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 #### Unique List Based (License Manager Only)
 - **Description:** Manages a list of unique IDs passed at consumption time
@@ -131,7 +100,7 @@ The platform supports multiple license model types that vendors can use to creat
   - Maximum number of total list items (up to infinity)
   - Admin capability to remove items from valid list
 - **Use Case:** Named user licensing, device licensing, MAC address restrictions
-- **Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+- **Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ---
 
@@ -158,7 +127,7 @@ Products can be exported via three routes:
 - Products packaged in standardized file format for export
 - Signed and encrypted for security
 
-**Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+**Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ---
 
@@ -187,7 +156,7 @@ All features share these foundational characteristics:
   - Technically unlimited but controlled by vendor policy
 - **Header Support:** Memory may contain header section defining content type
 
-**Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+**Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 3.2 Feature Organization
 
@@ -206,7 +175,7 @@ Represent a license model for a product or set of features:
 - Features can have individual license models
 - Overrides product or group settings
 
-**Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+**Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 3.3 Feature Structure
 
@@ -225,7 +194,7 @@ License Container
     └── Tokens
 ```
 
-**Source:** TLDocs/LMS/Activation/Activation.md
+**Source:** [Activation.md](../../TLCloud/LMS/Activation/Activation.md "TLCloud/LMS/Activation")
 
 ---
 
@@ -247,7 +216,7 @@ Vendors create contracts defining customer rights:
 - Contracts generate **Entitlements**
 - Contract data may be embedded in license containers
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 ### 4.2 Entitlements
 
@@ -258,7 +227,7 @@ Vendors create contracts defining customer rights:
 - May have recurrence pattern for automatic renewal
 - Defines what customer is authorized to activate
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 ---
 
@@ -286,7 +255,7 @@ The platform enables vendors to define:
 - License Containers (deployment mechanism for enforcement)
 - License Domains for License Container Rehost and Token Exchange
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 ---
 
@@ -356,7 +325,7 @@ Different license models require different persistence mechanisms:
 - Revocation requires blacklisting mechanism
 - Revoked products cannot be restored from backups
 
-**Source:** [Licensing Models.md](../TLCloud/TLDocs/LMS/Licensing%20Models.md "TLCloud/TLDocs/LMS")
+**Source:** [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md "TLCloud/LMS")
 
 ### 8.3 Role-Based Access Restrictions
 
@@ -380,7 +349,7 @@ Services require specific roles to perform operations:
 - Defined by Role AND Namespace combination
 - Namespace-based tenant isolation
 
-**Source:** [Roles_and_Namespaces.md](../TLCloud/TLDocs/LMS/Roles_and_Namespaces.md "TLCloud/TLDocs/LMS")
+**Source:** [Roles_and_Namespaces.md](../../TLCloud/LMS/Roles_and_Namespaces.md "TLCloud/LMS")
 
 ---
 
@@ -410,7 +379,7 @@ The platform provides comprehensive services organized into four categories:
 - **Instance Site:** Instance-specific configuration
 - **Templates:** UI and EMAIL template management
 
-**Source:** [01_Services.md](../TLCloud/TLDocs/LMS/01_Services.md "TLCloud/TLDocs/LMS")
+**Source:** [01_Services.md](../../TLCloud/LMS/01_Services.md "TLCloud/LMS")
 
 ### 9.2 License Model Service Operations
 
@@ -427,7 +396,7 @@ The platform provides comprehensive services organized into four categories:
 #### CRUD License Model Groups
 - Create and manage groups of related license models
 
-**Source:** [LicenseModels.md](../TLCloud/TLDocs/LMS/LicenseModels.md "TLCloud/TLDocs/LMS")
+**Source:** [LicenseModels.md](../../TLCloud/LMS/LicenseModels.md "TLCloud/LMS")
 
 ### 9.3 License Model Structure
 
@@ -448,7 +417,7 @@ The platform provides comprehensive services organized into four categories:
 }
 ```
 
-**Source:** [LicenseModels.md](../TLCloud/TLDocs/LMS/LicenseModels.md "TLCloud/TLDocs/LMS")
+**Source:** [LicenseModels.md](../../TLCloud/LMS/LicenseModels.md "TLCloud/LMS")
 
 ### 9.4 Enforcement Structure
 
@@ -457,7 +426,7 @@ The platform provides comprehensive services organized into four categories:
 - **LicenseModels Reference:** Links to applicable license models
 - **Activation Reference:** Links to activation process
 
-**Source:** [LicenseModels.md](../TLCloud/TLDocs/LMS/LicenseModels.md "TLCloud/TLDocs/LMS")
+**Source:** [LicenseModels.md](../../TLCloud/LMS/LicenseModels.md "TLCloud/LMS")
 
 ### 9.5 Activation Service Capabilities
 
@@ -466,7 +435,7 @@ The platform provides comprehensive services organized into four categories:
 - Revoke licenses
 - Storage of licenses
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 #### Activation Input Requirements
 
@@ -489,7 +458,7 @@ Container
     └── Tokens
 ```
 
-**Source:** TLDocs/LMS/Activation/Activation.md
+**Source:** [Activation.md](../../TLCloud/LMS/Activation/Activation.md "TLCloud/LMS/Activation")
 
 #### Activation Package Security
 
@@ -501,7 +470,7 @@ This dual-signature approach ensures:
 - Authorization from LMS
 - Confidentiality to specific client
 
-**Source:** [Activation.md](../TLCloud/TLDocs/LMS/Activation/Activation.md "TLCloud/TLDocs/LMS/Activation")
+**Source:** [Activation.md](../../TLCloud/LMS/Activation/Activation.md "TLCloud/LMS/Activation")
 
 ---
 
@@ -532,7 +501,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - **TLCloudClients:** Client SDK libraries
 - **TLVendor:** Vendor-specific utilities
 
-**Source:** [solution.overview.md](../TLCloud/_dev/solution.overview.md "TLCloud/_dev")
+**Source:** [solution.overview.md](../../TLCloud/_dev/solution.overview.md "TLCloud/_dev")
 
 ### 10.2 Vendor Services
 
@@ -542,7 +511,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - Hold vendor-specific secrets securely
 - Configure vendor namespaces
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 #### Administration Service
 **Capabilities:**
@@ -553,7 +522,7 @@ The TLCloud solution consists of multiple API services organized by function:
   - Email configuration
 - Download vendorized software and libraries
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 #### Customer Service
 **Functionality:**
@@ -563,7 +532,7 @@ The TLCloud solution consists of multiple API services organized by function:
   - Customers have contracts & entitlements
   - Customers have contacts
 
-**Source:** [ServicesDescription.md](../TLCloud/TLDocs/ServicesDescription.md "TLCloud/TLDocs")
+**Source:** [ServicesDescription.md](../../TLCloud/ServicesDescription.md "TLCloud")
 
 ### 10.3 API Security
 
@@ -582,7 +551,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - Implements caching for frequently accessed secrets
 - Reduces vault lookups
 
-**Source:** [VendorHeader.md](../TLCloud/_dev/VendorProtectionAPI/Extensions/VendorHeader.md "TLCloud/_dev/VendorProtectionAPI/Extensions")
+**Source:** [VendorHeader.md](../../TLCloud/_dev/VendorProtectionAPI/Extensions/VendorHeader.md "TLCloud/_dev/VendorProtectionAPI/Extensions")
 
 #### YARP Reverse Proxy
 
@@ -593,7 +562,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - `VendorInstance-Public:` Public instance identifier
 - `VendorInstance-Realm:` Realm/issuer for OAuth token validation
 
-**Source:** [Yarp.md](../TLCloud/TLDocs/Yarp.md "TLCloud/TLDocs")
+**Source:** [Yarp.md](../../TLCloud/Yarp.md "TLCloud")
 
 ---
 
@@ -629,7 +598,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - License checked per process launch
 - Suitable for metered applications
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 11.2 TLLicenseClient (Embedded Library)
 
@@ -652,7 +621,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - Supports offline license validation
 - Cached license data
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 11.3 TPM-Based Security
 
@@ -669,7 +638,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - Protection against software tampering
 - Boot state attestation via PCR (Platform Configuration Registers)
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 11.4 Fingerprint Alternative
 
@@ -685,7 +654,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - Same license may switch off TPM usage
 - Provides fallback for non-TPM environments
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 11.5 TLLicenseManager Features
 
@@ -697,7 +666,7 @@ The TLCloud solution consists of multiple API services organized by function:
 - PCR-based boot state attestation
 - Configurable logging levels
 
-**Source:** [TLLicenseManager_StartUp.md](../TL2/_docs/TLLicenseManager_StartUp.md "TL2/_docs")
+**Source:** [TLLicenseManager_StartUp.md](../../TL2/_docs/TLLicenseManager_StartUp.md "TL2/_docs")
 
 #### CLI Options
 
@@ -720,7 +689,7 @@ Options:
 - Windows: `C:\ProgramData\TrustedLicensing\Config\TLLicenseManager.json`
 - Linux: `/etc/trustedlicensing/TLLicenseManager.json`
 
-**Source:** [CLI_Integration.md](../TL2/_docs/CLI_Integration.md "TL2/_docs")
+**Source:** [CLI_Integration.md](../../TL2/_docs/CLI_Integration.md "TL2/_docs")
 
 ---
 
@@ -736,7 +705,7 @@ Options:
 5. Provision IDP secrets to vault
 6. Set configuration for instance container
 
-**Source:** [Provisioning.md](../TLCloud/TLDocs/LMS/Provisioning.md "TLCloud/TLDocs/LMS")
+**Source:** [Provisioning.md](../../TLCloud/LMS/Provisioning.md "TLCloud/LMS")
 
 ### 12.2 Vault Architecture
 
@@ -811,7 +780,7 @@ vault login -method userpass username=tlVendorAdmin password=<password>
 vault login <your-vault-token>
 ```
 
-**Source:** [Vault.md](../TLCloud/TLDocs/LMS/Vault.md "TLCloud/TLDocs/LMS")
+**Source:** [Vault.md](../../TLCloud/LMS/Vault.md "TLCloud/LMS")
 
 ### 12.3 Container Deployment Setup
 
@@ -842,7 +811,7 @@ Connections:
 - LM Web ←→ Keycloak
 ```
 
-**Source:** [Deployment.md](../TLCloud/TLDocs/Deployment.md "TLCloud/TLDocs")
+**Source:** [Deployment.md](../../TLCloud/Deployment.md "TLCloud")
 
 ### 12.4 Identity Provider Integration
 
@@ -855,7 +824,7 @@ The platform uses Keycloak as the Identity Provider for authentication and autho
 - Configure mapper to include client roles in JWT tokens
 - Enables role-based feature access in licensed applications
 
-**Source:** [Keycloak.md](../TLCloud/TLDocs/Keycloak/Keycloak.md "TLCloud/TLDocs/Keycloak")
+**Source:** [Keycloak.md](../../TLCloud/Keycloak/Keycloak.md "TLCloud/Keycloak")
 
 ---
 
@@ -875,7 +844,7 @@ The platform uses Keycloak as the Identity Provider for authentication and autho
 - **Hardware Binding:** Licenses bound to specific hardware
 - **Tamper Resistance:** Protected by hardware security
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 #### Secrets Management
 
@@ -887,7 +856,7 @@ The platform uses Keycloak as the Identity Provider for authentication and autho
 - Configuration encrypted by vendor or provider
 - Decrypted on client using TPM-backed keys
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 13.2 Identification and Trust
 
@@ -907,7 +876,7 @@ The platform uses Keycloak as the Identity Provider for authentication and autho
 - Role-based feature access
 - Single sign-on integration
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 #### Platform-Specific Trust
 
@@ -921,7 +890,7 @@ The platform uses Keycloak as the Identity Provider for authentication and autho
 - Similar trust mechanisms available
 - Platform-specific implementation details
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ### 13.3 Cryptographic Key Infrastructure
 
@@ -934,7 +903,7 @@ The platform uses a multi-layered cryptographic key system for security:
 - **Private Key:** Stored securely in TPM, never exposed
 - **Public Key:** Registered in LMS for client identification
 
-**Source:** [KeyRequired.md](../TLCloud/TLDocs/Client/KeyRequired.md "TLCloud/TLDocs/Client")
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
 
 #### Vendor Key (VK) - Asymmetric
 - **Purpose:** Identifies the software vendor
@@ -943,7 +912,7 @@ The platform uses a multi-layered cryptographic key system for security:
 - **Distribution:** Encrypted and delivered via secure download
 - **Restriction:** Allows consuming licenses only for specified vendor
 
-**Source:** [KeyRequired.md](../TLCloud/TLDocs/Client/KeyRequired.md "TLCloud/TLDocs/Client")
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
 
 #### License Generation Keys
 
@@ -964,7 +933,7 @@ This multi-layer encryption ensures:
 - Only specific client hardware can decrypt licenses
 - End-to-end confidentiality and authenticity
 
-**Source:** [KeyRequired.md](../TLCloud/TLDocs/Client/KeyRequired.md "TLCloud/TLDocs/Client")
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
 
 ### 13.4 Anti-Tampering and VM Detection
 
@@ -981,7 +950,7 @@ This multi-layer encryption ensures:
 
 **Note:** These methods are not foolproof and vary by virtualization platform.
 
-**Source:** [FingerPrints.md](../TLCloud/TLDocs/Client/FingerPrints.md "TLCloud/TLDocs/Client")
+**Source:** [FingerPrints.md](../../TLCloud/Client/FingerPrints.md "TLCloud/Client")
 
 #### TPM-Based Protection
 
@@ -991,45 +960,45 @@ This multi-layer encryption ensures:
 - PCR values change with system state
 - Platform attestation can detect VM manipulation
 
-**Source:** [Client Architecture.md](../TLCloud/TLDocs/Client/Client%20Architecture.md "TLCloud/TLDocs/Client")
+**Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client")
 
 ---
 
 ## 14. Document Sources
 
 ### Core Licensing Documentation
-- [input/TLDocs/LMS/Licensing Models.md](input/TLDocs/LMS/Licensing%20Models.md) - License model types and features
-- [input/TLDocs/LMS/LicenseModels.md](input/TLDocs/LMS/LicenseModels.md) - License model structure and operations
-- [input/TLDocs/LMS/Activation/Activation.md](input/TLDocs/LMS/Activation/Activation.md) - Activation process and security
-- [input/TLDocs/LMS/01_Services.md](input/TLDocs/LMS/01_Services.md) - Service categories overview
-- [input/TLDocs/LMS/Roles_and_Namespaces.md](input/TLDocs/LMS/Roles_and_Namespaces.md) - Role-based access control
-- [input/TLDocs/LMS/Provisioning.md](input/TLDocs/LMS/Provisioning.md) - Instance provisioning process
-- [input/TLDocs/LMS/Vault.md](input/TLDocs/LMS/Vault.md) - Vault CLI operations
-- [input/TLDocs/ServicesDescription.md](input/TLDocs/ServicesDescription.md) - Services overview
+- [Licensing Models.md](../../TLCloud/LMS/Licensing%20Models.md) - License model types and features
+- [LicenseModels.md](../../TLCloud/LMS/LicenseModels.md) - License model structure and operations
+- [Activation.md](../../TLCloud/LMS/Activation/Activation.md) - Activation process and security
+- [01_Services.md](../../TLCloud/LMS/01_Services.md) - Service categories overview
+- [Roles_and_Namespaces.md](../../TLCloud/LMS/Roles_and_Namespaces.md) - Role-based access control
+- [Provisioning.md](../../TLCloud/LMS/Provisioning.md) - Instance provisioning process
+- [Vault.md](../../TLCloud/LMS/Vault.md) - Vault CLI operations
+- [ServicesDescription.md](../../TLCloud/ServicesDescription.md) - Services overview
 
 ### Service Architecture
-- [input/_dev/solution.overview.md](input/_dev/solution.overview.md) - Complete service architecture
-- [input/_dev/solution.dependency.overview.md](input/_dev/solution.dependency.overview.md) - Service dependency graph
-- [input/TLDocs/Yarp.md](input/TLDocs/Yarp.md) - API gateway and routing
+- [solution.overview.md](../../TLCloud/_dev/solution.overview.md) - Complete service architecture
+- [solution.dependency.overview.md](../../TLCloud/_dev/solution.dependency.overview.md) - Service dependency graph
+- [Yarp.md](../../TLCloud/Yarp.md) - API gateway and routing
 
 ### Security and Multi-Tenancy
-- [input/_dev/VendorProtectionAPI/Extensions/VendorHeader.md](input/_dev/VendorProtectionAPI/Extensions/VendorHeader.md) - Security validation
-- [input/_vault/Vaults_Architecture.md](input/_vault/Vaults_Architecture.md) - Vault configuration and secret management
+- [VendorHeader.md](../../TLCloud/_dev/VendorProtectionAPI/Extensions/VendorHeader.md) - Security validation
+- [Vaults_Architecture.md](../../TLCloud/_vault/Vaults_Architecture.md) - Vault configuration and secret management
 
 ### Client and TPM
-- [input/TLDocs/Client/Client Architecture.md](input/TLDocs/Client/Client%20Architecture.md) - Client topology and TPM usage
-- [input/TLDocs/Client/KeyRequired.md](input/TLDocs/Client/KeyRequired.md) - Cryptographic key infrastructure
-- [input/TLDocs/Client/FingerPrints.md](input/TLDocs/Client/FingerPrints.md) - Fingerprint alternatives and VM detection
-- [input/TLDocs/Client/TPM_Requirements.md](input/TLDocs/Client/TPM_Requirements.md) - TPM requirements and derived keys
-- [input/TLDocs/Client/DaemonService.md](input/TLDocs/Client/DaemonService.md) - Service/daemon operations
-- [input/_docs/TLLicenseManager_StartUp.md](input/_docs/TLLicenseManager_StartUp.md) - Startup sequence and TPM operations
-- [input/_docs/CLI_Integration.md](input/_docs/CLI_Integration.md) - Command-line interface
-- [input/_docs/TPM_Docker_Kubernetes_Access.md](input/_docs/TPM_Docker_Kubernetes_Access.md) - Container deployment with TPM
+- [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md) - Client topology and TPM usage
+- [KeyRequired.md](../../TLCloud/Client/KeyRequired.md) - Cryptographic key infrastructure
+- [FingerPrints.md](../../TLCloud/Client/FingerPrints.md) - Fingerprint alternatives and VM detection
+- [TPM_Requirements.md](../../TLCloud/Client/TPM_Requirements.md) - TPM requirements and derived keys
+- [DaemonService.md](../../TLCloud/Client/DaemonService.md) - Service/daemon operations
+- [TLLicenseManager_StartUp.md](../../TL2/_docs/TLLicenseManager_StartUp.md) - Startup sequence and TPM operations
+- [CLI_Integration.md](../../TL2/_docs/CLI_Integration.md) - Command-line interface
+- [TPM_Docker_Kubernetes_Access.md](../../TL2/_docs/TPM_Docker_Kubernetes_Access.md) - Container deployment with TPM
 
 ### Deployment and Infrastructure
-- [input/TLDocs/Deployment.md](input/TLDocs/Deployment.md) - Vendor deployment and container setup
-- [input/TLDocs/Keycloak/Keycloak.md](input/TLDocs/Keycloak/Keycloak.md) - Identity provider configuration
-- [input/_Container/Docker/Linux/README.md](input/_Container/Docker/Linux/README.md) - Docker container features
+- [Deployment.md](../../TLCloud/Deployment.md) - Vendor deployment and container setup
+- [Keycloak.md](../../TLCloud/Keycloak/Keycloak.md) - Identity provider configuration
+- [README.md](../../TL2/_Container/Docker/Linux/README.md) - Docker container features
 
 ---
 
@@ -1525,5 +1494,29 @@ Include detailed technical information, code examples, and references to source 
 - Focus on licensing, features, services, and architecture documentation
 
 ---
+
+<!--
+GENERATION PROMPT:
+
+"Using the documents-available.json for source references, analyze all documents in the input folder and update 
+the License_Models_and_Features_Analysis.md with all information about:
+- License models (types, features, capabilities)
+- Features (properties, organization, structure)
+- Subscription models, pricing, product SKUs/editions, license tiers
+- Feature limitations and restrictions
+- License management capabilities and APIs
+- Client-side licensing architecture, provisioning, and technical capabilities
+
+IMPORTANT: Reference sources using relative paths from originalPath in documents-available.json.
+Format: **Source:** [filename.md](../Repository/path/to/file.md "Repository/path/to")
+- Link text displays filename only
+- Link target is full relative path
+- Title attribute (hover tooltip) shows directory path
+Do NOT use http:// or https:// links. Use filesystem relative paths only.
+
+Include detailed technical information, code examples, and always cite sources with relative paths.
+Update the timestamp to current date/time in English format with 24h time: 
+[System.Globalization.CultureInfo]::CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('en-US'); Get-Date -Format 'dd MMMM yyyy HH:mm'"
+-->
 
 **Document End**
