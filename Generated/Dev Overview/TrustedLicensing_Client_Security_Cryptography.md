@@ -1,25 +1,6 @@
 # Trusted Licensing Client Security and Cryptography
 
-**Generated:** 31 January 2026 13:48  
-**Last Updated:** 31 January 2026 13:48  
-**Source:** Consolidated documentation from TL2, TL2_dotnet, and TLCloud repositories via documents-available.json
-
----
-
-## Executive Summary
-
-The Trusted Licensing client architecture provides hardware-backed license enforcement using TPM 2.0 technology. The system consists of two main components: **TLLicenseManager** (service/daemon) and **TLLicenseClient** (embedded library), both implementing multi-layered cryptographic security with hardware-bound keys, secure storage, and tamper-resistant operations.
-
-**Key Security Features:**
-- TPM 2.0 hardware security module integration
-- Multi-layer cryptographic key hierarchy (SRK, VK, LGK, LMDK)
-- Hardware-bound license encryption
-- Deterministic key generation with reproducibility
-- Platform Configuration Register (PCR) attestation
-- NVRAM-based persistent storage
-- Multi-platform support (Windows/Linux, physical/containers)
-
----
+**Last Updated:** 31 January 2026 18:00
 
 ## 1. Client Architecture Overview
 
@@ -152,39 +133,144 @@ services:
 
 ## 3. Cryptographic Key Infrastructure
 
-### 3.1 Key Hierarchy
+### 3.1 Key Hierarchy Overview
 
-The system implements a four-layer cryptographic key hierarchy:
+The TrustedLicensing platform implements a sophisticated multi-layer cryptographic key hierarchy that provides strong isolation between platform operations, vendor tenants, hardware binding, and ephemeral license operations:
 
 ```mermaid
 flowchart TD
-    Provider["Platform Level: Provider Keys<br/>• Verify platform-issued information<br/>• Public keys distributed to clients"]
+    Provider["Platform Level: Provider Keys<br/>• RSA asymmetric (public/private)<br/>• Platform authentication and trust<br/>• Sign payloads in vendor-client data exchange<br/>• Public keys distributed to clients<br/>• Never leaves Provider infrastructure"]
     
-    SRK["Hardware Level: Storage Root Key (SRK)<br/>• TPM-generated RSA 2048/3072<br/>• Hardware-bound, never exposed<br/>• Handle: 0x81000835 (NV slot 2101)"]
+    VendorCode["Vendor Level: Vendor Code Keys<br/>• RSA (public/private) + AES symmetric<br/>• Multi-tenant vendor isolation<br/>• License generation and signing<br/>• Multiple vendor codes per vendor<br/>• Default: VENDOR_ROOT"]
     
-    VK["Vendor Level: Vendor Key (VK)<br/>• Vendor identification<br/>• Private key embedded in client libraries<br/>• Public key in License Management System"]
+    SRK["Hardware Level: Storage Root Key (SRK)<br/>• TPM-generated RSA 2048/3072<br/>• Hardware-bound, never exposed<br/>• Persistent NV Handle: 0x81000835<br/>• Fallback: Client Public Key (software)<br/>• Deterministic with seed value"]
     
-    License["License Level: LGK + LMDK<br/>• License Generation Key (symmetric)<br/>• License Manager Delivery Key (symmetric)<br/>• Session-specific, ephemeral"]
+    VendorKey["Vendor Key (VK)<br/>• RSA asymmetric<br/>• Identifies vendor in client<br/>• Private key secret in libraries<br/>• Public key in LMS<br/>• Encrypted delivery"]
     
-    Provider --> SRK
-    SRK --> VK
-    VK --> License
+    License["License Level: Ephemeral Keys<br/>• LGK (License Generation Key) - AES symmetric<br/>• LMDK (License Manager Delivery Key) - AES symmetric<br/>• Session-specific, per-activation<br/>• Multi-layer encryption protection"]
+    
+    Provider --> VendorCode
+    VendorCode --> SRK
+    VendorCode --> VendorKey
+    SRK --> License
+    VendorKey --> License
     
     style Provider fill:#e1f5ff
+    style VendorCode fill:#f0e1ff
     style SRK fill:#fff4e1
-    style VK fill:#f0e1ff
+    style VendorKey fill:#ffe1f5
     style License fill:#e1ffe1
 ```
 
-### 3.2 Storage Root Key (SRK)
+**Source:** [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture"), [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
+
+---
+
+### 3.2 Platform Level: Provider Keys
+
+**Purpose:** Platform-level authentication and trust establishment for data exchange between the Provider and vendor clients.
+
+**Key Characteristics:**
+- **Type:** RSA Asymmetric (public/private key pair)
+- **Algorithm:** RSA
+- **Purpose:** Sign payloads during data exchange between vendor and vendor client
+- **Usage:** Platform-level authentication and data integrity verification
+- **Storage Location:** VendorBoard (secure key vault)
+
+**Security Characteristics:**
+- ✅ Private key never leaves Provider infrastructure
+- ✅ Public key distributed to vendors for signature verification
+- ✅ Used for platform-level trust establishment
+- ✅ Enables verification of platform-issued information
+- ✅ Foundation of platform security model
+
+**Use Cases:**
+- Signing platform configuration data
+- Authenticating platform-issued licenses
+- Establishing trust chain for vendor operations
+- Verifying data integrity in client-platform communications
+
+**Source:** [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture")
+
+---
+
+### 3.3 Vendor Level: Vendor Code Keys
+
+**Purpose:** Vendor-specific license generation and multi-tenant isolation.
+
+**Key Characteristics:**
+- **Type:** RSA Asymmetric (public/private) + AES Symmetric
+- **Algorithm:** RSA + AES
+- **Purpose:** Vendor-specific generation of licenses and client assets (e.g., license managers)
+- **Storage Location:** VendorBoard (secure key vault)
+
+**Multi-Tenancy Architecture:**
+- **Vendor Independence:** Vendors are independent tenants from the Provider's perspective
+- **Multiple Vendor Codes:** Vendors can provision multiple vendor codes as required
+- **Organizational Separation:** Use case: Separate business units or product lines within vendor organization
+- **Default Code:** `VENDOR_ROOT` (recommended for testing and development)
+- **Client Transmission:** Vendor code information is transmitted to client during license activation
+- **Isolated Coexistence:** Licenses generated with different vendor codes are isolated but can coexist in the same infrastructure
+
+**Security Model:**
+- ✅ Each vendor code creates an isolated trust boundary
+- ✅ Compromised vendor code affects only licenses generated with that specific code
+- ✅ Enables granular security and organizational separation
+- ✅ Private keys must be protected with strict access controls
+- ✅ License Generator uses vendor code public key to encrypt licenses
+- ✅ Supports vendor-specific cryptographic policies
+
+**Operational Considerations:**
+- Vendor codes enable business unit separation
+- Different product lines can have isolated licensing
+- Testing and production can use separate vendor codes
+- Migration between vendor codes requires re-issuance of licenses
+
+**Source:** [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture"), [LicenseGeneration.md](../../TLCloud/Architecture/LicenseGeneration.md "TLCloud/Architecture")
+
+---
+
+### 3.4 Vendor Key (VK)
+
+**Purpose:** Identifies the vendor in client libraries and enables license consumption verification.
+
+**Key Characteristics:**
+- **Type:** RSA Asymmetric (public/private key pair)
+- **Algorithm:** RSA
+- **Purpose:** Vendor identification and license verification in client
+- **Storage Location (Private):** Embedded in client libraries (encrypted, protected)
+- **Storage Location (Public):** License Management System (LMS)
+- **Delivery:** Encrypted download for vendor
+
+**Security Characteristics:**
+- ✅ Private key is secret, embedded in client libraries
+- ✅ Public key registered in LMS for verification
+- ✅ Allows consumption of licenses for the specified vendor only
+- ✅ Encrypted delivery mechanism protects key distribution
+- ✅ Vendor-specific binding prevents cross-vendor license usage
+
+**Operational Role:**
+- Client libraries verify licenses using vendor public key
+- Prevents unauthorized vendor license consumption
+- Enables vendor-specific feature enforcement
+- Supports multi-vendor deployment scenarios
+
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client"), [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture")
+
+---
+
+### 3.5 Hardware Level: Storage Root Key (SRK)
+
+**Purpose:** Hardware-bound cryptographic operations with TPM security guarantees.
 
 **Key Characteristics:**
 - **Type:** RSA Asymmetric (2048/3072-bit)
 - **Generation:** TPM hardware CreatePrimary operation
-- **Storage:** TPM NVRAM persistent handle
+- **Storage:** TPM NVRAM persistent handle 0x81000835 (slot 2101)
 - **Private Key:** Never leaves TPM chip
-- **Public Key:** Exported as X.509 PEM
-- **Reproducibility:** Deterministic with seed value
+- **Public Key:** Exported as X.509 PEM format
+- **Reproducibility:** Deterministic with seed value (TPM_SEED)
+- **Algorithm:** RSA with OAEP-SHA256 padding scheme
 
 **Generation Process:**
 ```cpp
@@ -228,79 +314,169 @@ tpm.EvictControl(TPM_RH::OWNER, rsaKey.handle, persistHandle);
 - ✅ Private key never exposed
 - ✅ Can be re-created on TPM reset
 - ✅ Platform independent
+- ✅ Hardware attestation capable
+- ✅ Tamper-resistant operations
 
-**Source:** [TLLicenseManager_StartUp.md](../../TL2/_docs/TLLicenseManager_StartUp.md "TL2/_docs"), [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
+**TPM Operations Supported:**
+- RSA encryption/decryption
+- Digital signatures (with separate signing key)
+- Hardware fingerprinting
+- Secure key wrapping
+- License binding
 
-### 3.3 Vendor Key (VK)
+**Source:** [TLLicenseManager_StartUp.md](../../TL2/_docs_dev/TLLicenseManager_StartUp.md "TL2/_docs_dev"), [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client"), [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture")
 
-**Purpose:** Vendor identification and license binding
+---
+
+### 3.6 Client Fallback: Client Public Key (Local Public Key)
+
+**Purpose:** Fallback mechanism for platforms without TPM support.
 
 **Key Characteristics:**
-- **Type:** RSA Asymmetric (3072-bit)
-- **Private Key:** Embedded in client libraries (secret)
-- **Public Key:** Registered in License Management System
-- **Distribution:** Encrypted download via vendor channel
-- **Scope:** Allows consuming licenses for specific vendor only
+- **Type:** RSA Asymmetric (public/private key pair)
+- **Algorithm:** RSA (typically 2048-bit)
+- **Purpose:** Fallback mechanism for platforms without TPM support
+- **Storage Location:** Local persistence vault (vault.bin, software-based, AES-encrypted)
 
-**Security Model:**
-- Vendor private key must be protected
-- Compromised vendor key affects only that vendor's licenses
-- Multi-tenant isolation through vendor key separation
-- License Generator uses vendor public key to encrypt licenses
+**Fallback Mechanism:**
+- ✅ Used on platforms lacking TPM 2.0 hardware support
+- ✅ Provides functional licensing with reduced security compared to TPM
+- ⚠️ Requires dedicated license enablement from vendor
+- ✅ Suitable for development, testing, and non-critical deployments
+- ✅ Allows licensing on embedded systems without TPM
+- ✅ Supports custom hardware platforms
 
-**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
+**Security Trade-offs:**
+- ⚠️ Less secure than TPM-based approach
+- ⚠️ Private key stored in software (vulnerable to extraction)
+- ⚠️ No hardware attestation capabilities
+- ⚠️ Should be used only when TPM is unavailable
+- ⚠️ Requires additional vendor authorization
+- ⚠️ Increased risk of key compromise
 
-### 3.4 License Generation Keys
+**Use Cases:**
+- Development and testing environments
+- Platforms without TPM 2.0 support
+- Virtualized environments where TPM is not available
+- Legacy hardware compatibility
+- Embedded systems with custom security models
+
+**Source:** [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture"), [TLLicenseManager_StartUp.md](../../TL2/_docs_dev/TLLicenseManager_StartUp.md "TL2/_docs_dev")
+
+---
+
+### 3.7 License Level: Ephemeral Keys
 
 #### License Generation Key (LGK) - Symmetric
 - **Type:** AES-256 symmetric key
 - **Purpose:** Encrypt license payload data
-- **Lifetime:** Session-specific, ephemeral
+- **Lifetime:** Session-specific, ephemeral (per-license)
 - **Generation:** License Management System creates per-license
+- **Usage:** First layer of license data encryption
+- **Security:** Wrapped by LMDK for transmission
 
 #### License Manager Delivery Key (LMDK) - Symmetric
 - **Type:** AES-256 symmetric key
 - **Purpose:** Wrap/encrypt the LGK for secure transmission
-- **Lifetime:** Session-specific, ephemeral
+- **Lifetime:** Session-specific, ephemeral (per-activation)
 - **Generation:** License Management System creates per-activation
+- **Usage:** Second layer wrapping LGK
+- **Security:** Encrypted with SRK (TPM) public key for hardware binding
 
-**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
+**Ephemeral Key Benefits:**
+- ✅ New keys for each license generation
+- ✅ No key reuse across activations
+- ✅ Compromised key affects only single activation
+- ✅ Forward secrecy for license distribution
+- ✅ Automatic key rotation per operation
+- ✅ Minimal key management overhead
 
-### 3.5 Multi-Layer Encryption Flow
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client"), [LicenseGeneration.md](../../TLCloud/Architecture/LicenseGeneration.md "TLCloud/Architecture")
+
+---
+
+### 3.8 Multi-Layer Encryption Flow
 
 **License Creation and Delivery:**
 
+The license generation process involves secure data exchange between the Licensing Service and License Generator, ensuring vendor authentication, payload encryption, and client-specific binding. The complete workflow is documented in detail in [LicenseGeneration.md](../../TLCloud/Architecture/LicenseGeneration.md "TLCloud/Architecture") and visualized in [LicenseGenerationFlow.md](../../TLCloud/Architecture/LicenseGenerationFlow.md "TLCloud/Architecture").
+
+**Encryption Layers:**
+
 ```mermaid
 sequenceDiagram
-    participant LG as License Generator (Server)
-    participant Net as Network (HTTPS)
-    participant TL as TLLicenseManager (Client)
+    participant LS as Licensing Service
+    participant LG as License Generator<br/>(Server)
+    participant Net as Network<br/>(HTTPS)
+    participant TL as TLLicenseManager<br/>(Client)
     
-    Note over LG: 1. Create License Data (plaintext)
+    Note over LS,LG: 1. Job Creation
+    LS->>LS: Create Job with:<br/>- Vendor Code Public Key<br/>- Payload Signature<br/>- Transport Key (AES)
+    LS->>LG: Submit License Generation Job
+    
+    Note over LG: 2. Validation & Processing
+    LG->>LG: Validate Vendor Signature
+    LG->>LG: Check Vendor Code Status
+    LG->>LG: Decrypt Payload with Transport Key
+    
+    Note over LG: 3. Multi-Layer License Encryption
+    LG->>LG: 1. Create License Data (plaintext)
     LG->>LG: 2. Encrypt with LGK (AES-256)
-    LG->>LG: 3. Encrypt LGK with VK (RSA public)
+    LG->>LG: 3. Encrypt LGK with VK Public Key (RSA)
     LG->>LG: 4. Encrypt with LMDK (AES-256)
-    LG->>LG: 5. Encrypt LMDK with SRK (RSA public)
+    LG->>LG: 5. Encrypt LMDK with SRK Public Key (RSA)
+    LG->>LG: 6. Sign Package with Vendor Code Key (RSA)
     
-    LG->>Net: [Ciphertext Package]
-    Net->>TL: HTTP/HTTPS Delivery
+    Note over LG,Net: 4. Secure Delivery
+    LG->>Net: [Encrypted Package + Signatures]
+    Net->>TL: HTTPS Transmission
     
-    TL->>TL: 6. Decrypt LMDK with SRK private
-    TL->>TL: 7. Decrypt LGK with LMDK
-    TL->>TL: 8. Decrypt LGK with VK private
-    TL->>TL: 9. Decrypt license with LGK
+    Note over TL: 5. Client-Side Decryption
+    TL->>TL: 7. Verify LMS and Vendor Signatures
+    TL->>TL: 8. Decrypt LMDK with SRK Private Key (TPM)
+    TL->>TL: 9. Decrypt LGK with LMDK
+    TL->>TL: 10. Decrypt LGK wrapper with VK Private Key
+    TL->>TL: 11. Decrypt License Data with LGK
     
-    Note over TL: [License Data - Decrypted]
+    Note over TL: [License Data - Decrypted & Activated]
 ```
 
-**Security Benefits:**
-- ✅ End-to-end confidentiality
-- ✅ Hardware-bound decryption
-- ✅ Vendor-specific licenses
-- ✅ Multi-layer defense
-- ✅ Key exposure compartmentalization
+**Encryption Sequence Details:**
 
-**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client")
+**Server-Side (License Generator):**
+1. **Plaintext Creation:** License data (features, entitlements, expiration)
+2. **Layer 1 - LGK Encryption:** `Encrypted_License = AES256_Encrypt(LicenseData, LGK)`
+3. **Layer 2 - VK Wrapping:** `Encrypted_LGK = RSA_Encrypt(LGK, VendorKey_Public)`
+4. **Layer 3 - LMDK Encryption:** `Package_Layer1 = AES256_Encrypt(Encrypted_LGK + Encrypted_License, LMDK)`
+5. **Layer 4 - SRK Binding:** `Package_Final = RSA_Encrypt(LMDK, SRK_Public)`
+6. **Digital Signature:** `Signature = RSA_Sign(Package_Final, VendorCodeKey_Private)`
+
+**Client-Side (TLLicenseManager):**
+1. **Signature Verification:** `Verify(Signature, VendorCodeKey_Public) → Must pass`
+2. **Layer 1 - LMDK Decryption:** `LMDK = TPM_RSA_Decrypt(Package_Final, SRK_Private)` ← Hardware-bound
+3. **Layer 2 - LMDK Unwrapping:** `Encrypted_LGK + Encrypted_License = AES256_Decrypt(Package_Layer1, LMDK)`
+4. **Layer 3 - VK Unwrapping:** `LGK = RSA_Decrypt(Encrypted_LGK, VendorKey_Private)`
+5. **Layer 4 - License Decryption:** `LicenseData = AES256_Decrypt(Encrypted_License, LGK)`
+
+**Security Benefits:**
+- ✅ **End-to-end confidentiality:** Data encrypted from generation to activation
+- ✅ **Hardware-bound decryption:** SRK private key in TPM required for LMDK
+- ✅ **Vendor-specific licenses:** VK ensures vendor code isolation
+- ✅ **Multi-layer defense:** Compromise of single layer insufficient
+- ✅ **Key exposure compartmentalization:** Each key protects limited scope
+- ✅ **Cryptographic signature verification:** Authenticity guaranteed
+- ✅ **Session-specific keys:** LGK and LMDK unique per activation
+- ✅ **Platform authentication:** Provider keys verify platform data
+
+**Security Properties:**
+- **Confidentiality:** Multi-layer AES + RSA encryption
+- **Integrity:** Digital signatures from Vendor Code Key
+- **Authenticity:** Signature verification required
+- **Non-repudiation:** Signed by License Generator
+- **Hardware Binding:** SRK ensures device-specific activation
+- **Forward Secrecy:** Ephemeral keys (LGK, LMDK) prevent retroactive decryption
+
+**Source:** [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client"), [LicenseGeneration.md](../../TLCloud/Architecture/LicenseGeneration.md "TLCloud/Architecture"), [LicenseGenerationFlow.md](../../TLCloud/Architecture/LicenseGenerationFlow.md "TLCloud/Architecture")
 
 ---
 
@@ -1138,37 +1314,59 @@ curl http://localhost:52014/api/v1/license/status
 
 ### 14.1 Primary Sources
 
+**Cryptographic Architecture:**
+- [Crypto Entities.md](../../TLCloud/Architecture/Crypto%20Entities.md "TLCloud/Architecture") - Cryptographic entities and key management hierarchy
+- [LicenseGeneration.md](../../TLCloud/Architecture/LicenseGeneration.md "TLCloud/Architecture") - License generation workflow and security
+- [LicenseGenerationFlow.md](../../TLCloud/Architecture/LicenseGenerationFlow.md "TLCloud/Architecture") - Visual flow diagram of license generation
+
 **Client Architecture:**
-- [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md) - Overall topology and design
-- [KeyRequired.md](../../TLCloud/Client/KeyRequired.md) - Cryptographic key infrastructure
-- [FingerPrints.md](../../TLCloud/Client/FingerPrints.md) - Hardware fingerprinting
-- [TPM_Requirements.md](../../TLCloud/Client/TPM_Requirements.md) - TPM requirements and specifications
-- [DaemonService.md](../../TLCloud/Client/DaemonService.md) - Service/daemon operations
+- [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client") - Overall topology and design
+- [KeyRequired.md](../../TLCloud/Client/KeyRequired.md "TLCloud/Client") - Cryptographic key infrastructure
+- [FingerPrints.md](../../TLCloud/Client/FingerPrints.md "TLCloud/Client") - Hardware fingerprinting
+- [TPM_Requirements.md](../../TLCloud/Client/TPM_Requirements.md "TLCloud/Client") - TPM requirements and specifications
+- [DaemonService.md](../../TLCloud/Client/DaemonService.md "TLCloud/Client") - Service/daemon operations
+- [gRPC.md](../../TLCloud/Client/gRPC.md "TLCloud/Client") - gRPC API implementation
+- [VCPKG.md](../../TLCloud/Client/VCPKG.md "TLCloud/Client") - Dependency management
+- [TPMSimulator.md](../../TLCloud/Client/TPMSimulator.md "TLCloud/Client") - TPM simulator configuration
 
 **Implementation Details:**
-- [TLLicenseManager_StartUp.md](../../TL2/_docs/TLLicenseManager_StartUp.md) - Complete startup sequence and TPM operations
-- [TPM_Docker_Kubernetes_Access.md](../../TL2/_docs/TPM_Docker_Kubernetes_Access.md) - Container deployment
-- [CLI_Integration.md](../../TL2/_docs/CLI_Integration.md) - Command-line interface
+- [TLLicenseManager_StartUp.md](../../TL2/_docs_dev/TLLicenseManager_StartUp.md "TL2/_docs_dev") - Complete startup sequence and TPM operations
+- [TPM_Docker_Kubernetes_Access.md](../../TL2/_docs/TPM_Docker_Kubernetes_Access.md "TL2/_docs") - Container deployment
+- [CLI_Integration.md](../../TL2/_docs/CLI_Integration.md "TL2/_docs") - Command-line interface
 
 **Development:**
-- [TPMTodo.md](../../TLCloud/ToDo/TPMTodo.md) - Planned features and enhancements
+- [TPMTodo.md](../../TLCloud/ToDo/TPMTodo.md "TLCloud/ToDo") - Planned features and enhancements
 
 ### 14.2 Related Documentation
 
-- License_Models_and_Features_Analysis.md - Licensing capabilities
-- TrustedLicensing365_Marketing_Overview.md - Platform overview
+- [License_Models_and_Features_Analysis.md](License_Models_and_Features_Analysis.md) - Licensing capabilities
+- [TrustedLicensing365_Marketing_Overview.md](../Marketing/TrustedLicensing365_Marketing_Overview.md) - Platform overview
 
 ---
 
 ## 15. Document Metadata
 
 **Document Information:**
-- **Version:** 1.0
+- **Version:** 1.2
 - **Generated:** 31 January 2026 13:48
-- **Last Updated:** 31 January 2026 13:48
-- **Total Sources:** 9 documents from documents-available.json
+- **Last Updated:** 31 January 2026 18:00
+- **Total Sources:** 15 documents from documents-available.json
 - **Document Type:** Technical Architecture Documentation
 - **Audience:** Developers, Security Engineers, DevOps
+
+**Recent Updates:**
+- Comprehensive refresh with latest source document information
+- Added detailed Provider Keys section with platform-level authentication
+- Expanded Vendor Code Keys with multi-tenancy architecture details
+- Added Vendor Key (VK) section for client-side vendor identification
+- Enhanced Storage Root Key (SRK) with complete generation process
+- Expanded Client Public Key fallback mechanism with use cases
+- Detailed ephemeral keys (LGK/LMDK) with security benefits
+- Comprehensive multi-layer encryption flow with sequence diagram
+- Updated all source citations with correct relative paths
+- Added Crypto Entities.md, LicenseGeneration.md, and LicenseGenerationFlow.md to sources
+- Updated timestamp to 31 January 2026 18:00
+- Improved document organization and clarity
 
 ---
 

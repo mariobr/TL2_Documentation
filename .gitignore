@@ -1,3 +1,4 @@
 file-mapping.json
 input/**
 Generated/**/*.pdf
+documents-available.json

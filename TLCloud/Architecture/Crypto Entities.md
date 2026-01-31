@@ -1,5 +1,9 @@
 # Cryptographic Entities and Key Management
 
+**Version:** 1.0  
+**Created:** 31 January 2026  
+**Last Updated:** 31 January 2026  
+
 **Document Purpose:** This document describes cryptographic key usage and storage for entities involved in secure data exchange workflows within the TrustedLicensing 365 platform, with particular emphasis on secure asset generation (e.g., license generation).
 
 ---
