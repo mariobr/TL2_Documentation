@@ -1,5 +1,16 @@
-# Script to copy documentation files from parent directories
+# Script to copy documentation files from parent directories and create file mappings
 # Target extensions: .md, .docx, .pdf, .ppt, .pptx
+
+param(
+    [switch]$Copy,
+    [switch]$Scan,
+    [switch]$RemoveSources
+)
+
+# Default to scan mode if no option specified
+if (-not $Copy -and -not $Scan -and -not $RemoveSources) {
+    $Scan = $true
+}
 
 # Define workspace and parent directory
 $workspaceDir = $PSScriptRoot
@@ -12,66 +23,230 @@ $sourceDirs = @(
     (Join-Path $parentDir "TLCloud")
 )
 
-# Define destination directory
-$destinationDir = Join-Path $workspaceDir "input"
+# Define target extensions
+$extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx")
 
-# Create destination directory if it doesn't exist
-if (-not (Test-Path $destinationDir)) {
-    New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
-    Write-Host "Created destination directory: $destinationDir" -ForegroundColor Green
-}
+# Define ignored subdirectories (without leading slash)
+$ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules")
 
-# Define file extensions to copy
-$extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx", "*.drawio", "plantuml")
-
-# Define directories to ignore
-$ignoreDirs = @("vcpkg_installed", "out")
+# Define mapping output file
+$mappingFile = Join-Path $workspaceDir "file-mapping.json"
 
 # Track statistics
 $totalCopied = 0
 $totalSkipped = 0
+$totalNew = 0
+$totalUpdated = 0
 
-# Copy files from each source directory
-foreach ($sourceDir in $sourceDirs) {
-    if (Test-Path $sourceDir) {
-        Write-Host "`nProcessing: $sourceDir" -ForegroundColor Cyan
-        
-        foreach ($ext in $extensions) {
-            $files = Get-ChildItem -Path $sourceDir -Filter $ext -Recurse -File -ErrorAction SilentlyContinue
+# Load existing mapping if in scan or remove mode
+$existingMapping = @{}
+if (($Scan -or $RemoveSources) -and (Test-Path $mappingFile)) {
+    try {
+        $existingMappingJson = Get-Content -Path $mappingFile -Raw -Encoding UTF8
+        $existingMapping = $existingMappingJson | ConvertFrom-Json -AsHashtable
+        Write-Host "Loaded existing mapping with $($existingMapping.Count) files" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "Warning: Could not load existing mapping file" -ForegroundColor Yellow
+    }
+}
+
+# Create mapping structure
+$mapping = @{}
+$newFiles = @()
+$updatedFiles = @()
+
+# Handle remove sources mode
+if ($RemoveSources) {
+    if (-not (Test-Path $mappingFile)) {
+        Write-Host "Error: No mapping file found. Run a scan or copy operation first." -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host "Scanning for new files..." -ForegroundColor Cyan
+    
+    # First, scan for new files
+    foreach ($sourceDir in $sourceDirs) {
+        if (Test-Path $sourceDir) {
+            $sourceDirName = Split-Path $sourceDir -Leaf
             
-            foreach ($file in $files) {
-                try {
+            foreach ($ext in $extensions) {
+                $files = Get-ChildItem -Path $sourceDir -Filter $ext -Recurse -File -ErrorAction SilentlyContinue
+                
+                foreach ($file in $files) {
+                    # Calculate relative path
                     $relativePath = $file.FullName.Substring($sourceDir.Length + 1)
+                    $relativePathNormalized = $relativePath -replace '\\', '/'
                     
-                    # Skip if file is in ignored directory
+                    # Check if file is in an ignored folder
                     $shouldIgnore = $false
-                    foreach ($ignoreDir in $ignoreDirs) {
-                        if ($relativePath -like "$ignoreDir*" -or $relativePath -like "*\$ignoreDir\*" -or $relativePath -like "*/$ignoreDir/*") {
+                    foreach ($ignoreFolder in $ignoreFolders) {
+                        if ($relativePathNormalized -like "$ignoreFolder/*" -or $relativePathNormalized -like "*/$ignoreFolder/*") {
                             $shouldIgnore = $true
                             break
                         }
                     }
                     
                     if ($shouldIgnore) {
-                        $totalSkipped++
                         continue
                     }
                     
-                    $destPath = Join-Path $destinationDir $relativePath
-                    $destFolder = Split-Path $destPath -Parent
+                    $mappingPath = "$sourceDirName/$relativePathNormalized"
                     
-                    # Create subfolder structure in destination
-                    if (-not (Test-Path $destFolder)) {
-                        New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
+                    # Check if file is new
+                    if (-not $existingMapping.ContainsKey($mappingPath)) {
+                        $totalNew++
+                        Write-Host "  [NEW] $mappingPath" -ForegroundColor Green
+                    }
+                }
+            }
+        }
+    }
+    
+    if ($totalNew -gt 0) {
+        Write-Host "\nError: Cannot remove source files when new files are detected ($totalNew new files)." -ForegroundColor Red
+        Write-Host "Please run with -Copy first to copy the new files." -ForegroundColor Yellow
+        exit 1
+    }
+    
+    Write-Host "\nNo new files detected. Checking for source files that can be removed...\n" -ForegroundColor Green
+    
+    # Find source files that still exist
+    $totalDeleted = 0
+    $totalNotFound = 0
+    $filesToProcess = @()
+    
+    # First pass: collect files that still exist
+    foreach ($mappingPath in $existingMapping.Keys) {
+        $entry = $existingMapping[$mappingPath]
+        $sourcePath = $entry.source
+        
+        if (Test-Path $sourcePath) {
+            $filesToProcess += @{
+                MappingPath = $mappingPath
+                SourcePath = $sourcePath
+            }
+        }
+        else {
+            $totalNotFound++
+        }
+    }
+    
+    $totalFiles = $filesToProcess.Count
+    $currentFile = 0
+    
+    # Second pass: process each file with counter
+    foreach ($fileInfo in $filesToProcess) {
+        $currentFile++
+        $remaining = $totalFiles - $currentFile
+        
+        Write-Host "[$currentFile/$totalFiles] Found: $($fileInfo.MappingPath)" -ForegroundColor Cyan
+        Write-Host "  Source: $($fileInfo.SourcePath)" -ForegroundColor Gray
+        Write-Host "  Remaining: $remaining files" -ForegroundColor Gray
+        $response = Read-Host "  Delete this source file? (Y/N)"
+        
+        if ($response -eq 'Y' -or $response -eq 'y') {
+            try {
+                Remove-Item -Path $fileInfo.SourcePath -Force
+                Write-Host "  [DELETED] $($fileInfo.SourcePath)" -ForegroundColor Yellow
+                $totalDeleted++
+            }
+            catch {
+                Write-Host "  [ERROR] Failed to delete: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "  [SKIPPED]" -ForegroundColor Yellow
+        }
+        Write-Host ""
+    }
+    
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Remove sources completed!" -ForegroundColor Cyan
+    Write-Host "Total files in mapping: $($existingMapping.Count)" -ForegroundColor Cyan
+    Write-Host "Files deleted: $totalDeleted" -ForegroundColor Red
+    Write-Host "Files already removed: $totalNotFound" -ForegroundColor Gray
+    Write-Host "========================================" -ForegroundColor Cyan
+    
+    exit 0
+}
+
+# Scan or copy files from each source directory
+foreach ($sourceDir in $sourceDirs) {
+    if (Test-Path $sourceDir) {
+        $actionVerb = if ($Scan) { "Scanning" } else { "Processing" }
+        Write-Host "`n${actionVerb}: $sourceDir" -ForegroundColor Cyan
+        $sourceDirName = Split-Path $sourceDir -Leaf
+        
+        foreach ($ext in $extensions) {
+            $files = Get-ChildItem -Path $sourceDir -Filter $ext -Recurse -File -ErrorAction SilentlyContinue
+            
+            foreach ($file in $files) {
+                try {
+                    # Calculate relative path
+                    $relativePath = $file.FullName.Substring($sourceDir.Length + 1)
+                    $relativePathNormalized = $relativePath -replace '\\', '/'
+                    
+                    # Check if file is in an ignored folder
+                    $shouldIgnore = $false
+                    foreach ($ignoreFolder in $ignoreFolders) {
+                        # Check if path starts with ignored folder or contains it as a subdirectory
+                        if ($relativePathNormalized -like "$ignoreFolder/*" -or $relativePathNormalized -like "*/$ignoreFolder/*") {
+                            $shouldIgnore = $true
+                            break
+                        }
                     }
                     
-                    # Copy file
-                    Copy-Item -Path $file.FullName -Destination $destPath -Force
-                    Write-Host "  Copied: $relativePath" -ForegroundColor Gray
-                    $totalCopied++
+                    if ($shouldIgnore) {
+                        continue
+                    }
+                    
+                    $mappingPath = "$sourceDirName/$relativePathNormalized"
+                    $relativePath = $file.FullName.Substring($sourceDir.Length + 1)
+                    $relativePathNormalized = $relativePath -replace '\\', '/'
+                    $mappingPath = "$sourceDirName/$relativePathNormalized"
+                    $lastModified = $file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+                    
+                    # Check if file is new or updated (in scan mode)
+                    if ($Scan) {
+                        if (-not $existingMapping.ContainsKey($mappingPath)) {
+                            $totalNew++
+                            $newFiles += $mappingPath
+                            Write-Host "  [NEW] $mappingPath" -ForegroundColor Green
+                        }
+                        elseif ($existingMapping[$mappingPath].lastModified -ne $lastModified) {
+                            $totalUpdated++
+                            $updatedFiles += $mappingPath
+                            Write-Host "  [UPDATED] $mappingPath" -ForegroundColor Yellow
+                        }
+                    }
+                    
+                    # Copy file if in copy mode
+                    if ($Copy) {
+                        $destPath = Join-Path $workspaceDir "$sourceDirName\$relativePath"
+                        $destFolder = Split-Path $destPath -Parent
+                        
+                        if (-not (Test-Path $destFolder)) {
+                            New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
+                        }
+                        
+                        Copy-Item -Path $file.FullName -Destination $destPath -Force
+                        Write-Host "  Copied: $sourceDirName\$relativePath" -ForegroundColor Gray
+                        $totalCopied++
+                    }
+                    
+                    # Create mapping entry
+                    $mapping[$mappingPath] = @{
+                        source = $file.FullName
+                        sourceRepository = $sourceDirName
+                        relativePath = $relativePathNormalized
+                        lastModified = $lastModified
+                        destination = if ($Copy) { Join-Path $workspaceDir "$sourceDirName\$relativePath" } else { "" }
+                    }
                 }
                 catch {
-                    Write-Host "  Error copying $($file.Name): $_" -ForegroundColor Red
+                    $action = if ($Copy) { "copying" } else { "scanning" }
+                    Write-Host "  Error $action $($file.Name): $_" -ForegroundColor Red
                     $totalSkipped++
                 }
             }
@@ -82,10 +257,43 @@ foreach ($sourceDir in $sourceDirs) {
     }
 }
 
-# Display summary
-Write-Host "`n========================================" -ForegroundColor Green
-Write-Host "Copy operation completed!" -ForegroundColor Green
-Write-Host "Total files copied: $totalCopied" -ForegroundColor Green
-Write-Host "Total files skipped: $totalSkipped" -ForegroundColor Yellow
-Write-Host "Destination: $destinationDir" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
+# Handle scan mode results
+if ($Scan) {
+    Write-Host "`n========================================" -ForegroundColor Cyan
+    Write-Host "Scan completed!" -ForegroundColor Cyan
+    Write-Host "Total files scanned: $($mapping.Count)" -ForegroundColor Cyan
+    Write-Host "New files: $totalNew" -ForegroundColor Green
+    Write-Host "Updated files: $totalUpdated" -ForegroundColor Yellow
+    Write-Host "Skipped files: $totalSkipped" -ForegroundColor Gray
+    Write-Host "========================================" -ForegroundColor Cyan
+    
+    if ($totalNew -gt 0 -or $totalUpdated -gt 0) {
+        Write-Host "`nChanges detected!" -ForegroundColor Yellow
+        $response = Read-Host "`nDo you want to copy the changed files? (Y/N)"
+        
+        if ($response -eq 'Y' -or $response -eq 'y') {
+            Write-Host "`nRunning copy operation..." -ForegroundColor Green
+            & $PSCommandPath -Copy
+        }
+        else {
+            Write-Host "`nCopy skipped. Run with -Copy flag to copy files manually." -ForegroundColor Gray
+        }
+    }
+    else {
+        Write-Host "`nNo changes detected. All files are up to date." -ForegroundColor Green
+    }
+}
+else {
+    # Write mapping to JSON file in copy mode
+    $mappingJson = $mapping | ConvertTo-Json -Depth 10
+    Set-Content -Path $mappingFile -Value $mappingJson -Encoding UTF8
+    
+    # Display summary
+    Write-Host "`n========================================" -ForegroundColor Green
+    Write-Host "Copy and mapping operation completed!" -ForegroundColor Green
+    Write-Host "Total files copied: $totalCopied" -ForegroundColor Green
+    Write-Host "Total files skipped: $totalSkipped" -ForegroundColor Yellow
+    Write-Host "Destination: $workspaceDir" -ForegroundColor Green
+    Write-Host "Mapping file: $mappingFile" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+}

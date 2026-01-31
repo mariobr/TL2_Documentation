@@ -1,0 +1,19 @@
+@startuml
+
+
+
+map TLLicenseManager {
+1 ==> TrustedPlatform    
+2 ==> FingerPrint
+3 ==> NetworkLicenseHost
+
+}
+
+map TLLicenseClient {
+1 ==> TrustedPlatform    
+2 ==> FingerPrint
+3 ==> Standalone
+
+}
+
+@enduml

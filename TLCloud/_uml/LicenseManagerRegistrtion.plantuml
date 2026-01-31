@@ -1,0 +1,17 @@
+@startuml License Manager Registration
+autonumber
+actor Installer as Installer
+entity TPM as TPM
+participant LicenseManager as LM
+participant LicenseManagement as LMS
+Installer -> LM : Start
+LM -> LM : Initialize
+LM -> TPM : Detect
+TPM -> LM : No TPM
+LM -> LM : Create Fingerprint 
+LM -> LMS : Register Fingerprint
+TPM -> LM : TPM detected
+LM -> TPM : Generate \nStorage Root Key (SRK)
+TPM -> LM : SRK as Fingerprint
+LM -> LMS : Register Fingerprint (SRK)
+@enduml
