@@ -1,1 +1,0 @@
-Repository for Trusted Licensing Cloud Services

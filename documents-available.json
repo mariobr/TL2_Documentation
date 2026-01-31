@@ -31,21 +31,21 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs\\CLI_Integration.md",
     "relativePath": "_docs/CLI_Integration.md"
   },
-  "TL2/_docs/TLLicenseManager_StartUp.md": {
-    "repository": "TL2",
-    "size": 37277,
-    "lastModified": "2026-01-29 05:54:41",
-    "workspaceRelativePath": "TL2/_docs/TLLicenseManager_StartUp.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs\\TLLicenseManager_StartUp.md",
-    "relativePath": "_docs/TLLicenseManager_StartUp.md"
-  },
-  "TLCloud/_dev/TLCloudHost/ReadMe.md": {
+  "TLCloud/01_BuildCompileCMake.md": {
     "repository": "TLCloud",
-    "size": 1331,
-    "lastModified": "2025-12-01 18:21:41",
-    "workspaceRelativePath": "TLCloud/_dev/TLCloudHost/ReadMe.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\TLCloudHost\\ReadMe.md",
-    "relativePath": "_dev/TLCloudHost/ReadMe.md"
+    "size": 1784,
+    "lastModified": "2025-12-30 12:24:46",
+    "workspaceRelativePath": "TLCloud/01_BuildCompileCMake.md",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\01_BuildCompileCMake.md",
+    "relativePath": "01_BuildCompileCMake.md"
+  },
+  "TLCloud/_vault/Vaults_Architecture.md": {
+    "repository": "TLCloud",
+    "size": 1696,
+    "lastModified": "2025-12-02 14:09:58",
+    "workspaceRelativePath": "TLCloud/_vault/Vaults_Architecture.md",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_vault\\Vaults_Architecture.md",
+    "relativePath": "_vault/Vaults_Architecture.md"
   },
   "TLCloud/_dev/solution.dependency.overview.md": {
     "repository": "TLCloud",
@@ -63,21 +63,13 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\vcpkg_install_triplets_hint.md",
     "relativePath": "vcpkg_install_triplets_hint.md"
   },
-  "TLCloud/Conceptual Background/AF_with-intro.pdf": {
+  "TLCloud/C++/POCO-170-XML.pdf": {
     "repository": "TLCloud",
-    "size": 1346424,
+    "size": 293458,
     "lastModified": "2025-12-19 18:27:32",
-    "workspaceRelativePath": "TLCloud/Conceptual Background/AF_with-intro.pdf",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\AF_with-intro.pdf",
-    "relativePath": "Conceptual Background/AF_with-intro.pdf"
-  },
-  "TLCloud/LMS/Licensing Models.md": {
-    "repository": "TLCloud",
-    "size": 3513,
-    "lastModified": "2025-12-19 18:27:32",
-    "workspaceRelativePath": "TLCloud/LMS/Licensing Models.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LMS\\Licensing Models.md",
-    "relativePath": "LMS/Licensing Models.md"
+    "workspaceRelativePath": "TLCloud/C++/POCO-170-XML.pdf",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\C++\\POCO-170-XML.pdf",
+    "relativePath": "C++/POCO-170-XML.pdf"
   },
   "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf": {
     "repository": "TLCloud",
@@ -86,6 +78,22 @@
     "workspaceRelativePath": "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf",
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\Defending agaings VM Rollback.pdf",
     "relativePath": "Conceptual Background/Defending agaings VM Rollback.pdf"
+  },
+  "TLCloud/_vault/autounsealDEV/autounseal4dev.md": {
+    "repository": "TLCloud",
+    "size": 3042,
+    "lastModified": "2025-12-02 14:09:58",
+    "workspaceRelativePath": "TLCloud/_vault/autounsealDEV/autounseal4dev.md",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_vault\\autounsealDEV\\autounseal4dev.md",
+    "relativePath": "_vault/autounsealDEV/autounseal4dev.md"
+  },
+  "TL2/_docs_dev/TLLicenseManager_StartUp.md": {
+    "repository": "TL2",
+    "size": 37277,
+    "lastModified": "2026-01-29 05:54:41",
+    "workspaceRelativePath": "TL2/_docs_dev/TLLicenseManager_StartUp.md",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs_dev\\TLLicenseManager_StartUp.md",
+    "relativePath": "_docs_dev/TLLicenseManager_StartUp.md"
   },
   "TLCloud/ToDo/TPMTodo.md": {
     "repository": "TLCloud",
@@ -103,14 +111,6 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LMS\\Vault.md",
     "relativePath": "LMS/Vault.md"
   },
-  "TLCloud/_dev/README.md": {
-    "repository": "TLCloud",
-    "size": 114,
-    "lastModified": "2025-12-01 18:21:41",
-    "workspaceRelativePath": "TLCloud/_dev/README.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\README.md",
-    "relativePath": "_dev/README.md"
-  },
   "TLCloud/Client/FingerPrints.md": {
     "repository": "TLCloud",
     "size": 1391,
@@ -118,14 +118,6 @@
     "workspaceRelativePath": "TLCloud/Client/FingerPrints.md",
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\FingerPrints.md",
     "relativePath": "Client/FingerPrints.md"
-  },
-  "TLCloud/C++/POCO-170-XML.pdf": {
-    "repository": "TLCloud",
-    "size": 293458,
-    "lastModified": "2025-12-19 18:27:32",
-    "workspaceRelativePath": "TLCloud/C++/POCO-170-XML.pdf",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\C++\\POCO-170-XML.pdf",
-    "relativePath": "C++/POCO-170-XML.pdf"
   },
   "TLCloud/Yarp.md": {
     "repository": "TLCloud",
@@ -135,13 +127,13 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Yarp.md",
     "relativePath": "Yarp.md"
   },
-  "TLCloud/README.md": {
+  "TLCloud/Conceptual Background/AF_with-intro.pdf": {
     "repository": "TLCloud",
-    "size": 47,
-    "lastModified": "2025-12-01 18:21:41",
-    "workspaceRelativePath": "TLCloud/README.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\README.md",
-    "relativePath": "README.md"
+    "size": 1346424,
+    "lastModified": "2025-12-19 18:27:32",
+    "workspaceRelativePath": "TLCloud/Conceptual Background/AF_with-intro.pdf",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\AF_with-intro.pdf",
+    "relativePath": "Conceptual Background/AF_with-intro.pdf"
   },
   "TLCloud/ServicesDescription.md": {
     "repository": "TLCloud",
@@ -215,13 +207,13 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\ProblemsDiscovered.md",
     "relativePath": "ProblemsDiscovered.md"
   },
-  "TLCloud/01_BuildCompileCMake.md": {
+  "TLCloud/LMS/Licensing Models.md": {
     "repository": "TLCloud",
-    "size": 1784,
-    "lastModified": "2025-12-30 12:24:46",
-    "workspaceRelativePath": "TLCloud/01_BuildCompileCMake.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\01_BuildCompileCMake.md",
-    "relativePath": "01_BuildCompileCMake.md"
+    "size": 3513,
+    "lastModified": "2025-12-19 18:27:32",
+    "workspaceRelativePath": "TLCloud/LMS/Licensing Models.md",
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LMS\\Licensing Models.md",
+    "relativePath": "LMS/Licensing Models.md"
   },
   "TLCloud/_dev/solution.overview.md": {
     "repository": "TLCloud",
@@ -334,14 +326,6 @@
     "workspaceRelativePath": "TLCloud/Client/gRPC.md",
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\gRPC.md",
     "relativePath": "Client/gRPC.md"
-  },
-  "TLCloud/_dev/TLWriteSecrets/Readme.md": {
-    "repository": "TLCloud",
-    "size": 88,
-    "lastModified": "2025-12-01 18:21:41",
-    "workspaceRelativePath": "TLCloud/_dev/TLWriteSecrets/Readme.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\TLWriteSecrets\\Readme.md",
-    "relativePath": "_dev/TLWriteSecrets/Readme.md"
   },
   "TLCloud/Deployment.md": {
     "repository": "TLCloud",

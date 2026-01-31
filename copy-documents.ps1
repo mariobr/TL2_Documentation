@@ -28,10 +28,13 @@ $extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx")
 
 # Define ignored subdirectories (without leading slash)
 $ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules", ".devcontainer",
-                 "_Container", "_SBOM", "_Scripts")
+                 "_Container", "_SBOM", "_Scripts", "_docs_local" )
 
 # Define copy-only folders (files from these folders will be copied but never deleted from source)
-$copyOnlyFolders = @("_vault" )
+$copyOnlyFolders = @("_vault", "_docs_dev")
+
+# Define ignored file patterns (files matching these patterns will be ignored)
+$ignoreFiles = @("README.md")
 
 # Define mapping output file
 $mappingFile = Join-Path $workspaceDir "file-mapping.json"
@@ -86,6 +89,19 @@ if ($RemoveSources) {
                     $shouldIgnore = $false
                     foreach ($ignoreFolder in $ignoreFolders) {
                         if ($relativePathNormalized -like "$ignoreFolder/*" -or $relativePathNormalized -like "*/$ignoreFolder/*") {
+                            $shouldIgnore = $true
+                            break
+                        }
+                    }
+                    
+                    if ($shouldIgnore) {
+                        continue
+                    }
+                    
+                    # Check if file matches ignored file patterns
+                    $fileName = $file.Name
+                    foreach ($ignorePattern in $ignoreFiles) {
+                        if ($fileName -ilike $ignorePattern) {
                             $shouldIgnore = $true
                             break
                         }
@@ -216,6 +232,19 @@ foreach ($sourceDir in $sourceDirs) {
                     foreach ($ignoreFolder in $ignoreFolders) {
                         # Check if path starts with ignored folder or contains it as a subdirectory
                         if ($relativePathNormalized -like "$ignoreFolder/*" -or $relativePathNormalized -like "*/$ignoreFolder/*") {
+                            $shouldIgnore = $true
+                            break
+                        }
+                    }
+                    
+                    if ($shouldIgnore) {
+                        continue
+                    }
+                    
+                    # Check if file matches ignored file patterns
+                    $fileName = $file.Name
+                    foreach ($ignorePattern in $ignoreFiles) {
+                        if ($fileName -ilike $ignorePattern) {
                             $shouldIgnore = $true
                             break
                         }
