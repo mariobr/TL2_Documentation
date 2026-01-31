@@ -87,22 +87,6 @@
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\Defending agaings VM Rollback.pdf",
     "relativePath": "Conceptual Background/Defending agaings VM Rollback.pdf"
   },
-  "TLCloud/_vault/autounsealDEV/autounseal4dev.md": {
-    "repository": "TLCloud",
-    "size": 3042,
-    "lastModified": "2025-12-02 14:09:58",
-    "workspaceRelativePath": "TLCloud/_vault/autounsealDEV/autounseal4dev.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_vault\\autounsealDEV\\autounseal4dev.md",
-    "relativePath": "_vault/autounsealDEV/autounseal4dev.md"
-  },
-  "TLCloud/_vault/Vaults_Architecture.pdf": {
-    "repository": "TLCloud",
-    "size": 55271,
-    "lastModified": "2025-12-02 14:09:58",
-    "workspaceRelativePath": "TLCloud/_vault/Vaults_Architecture.pdf",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_vault\\Vaults_Architecture.pdf",
-    "relativePath": "_vault/Vaults_Architecture.pdf"
-  },
   "TLCloud/ToDo/TPMTodo.md": {
     "repository": "TLCloud",
     "size": 365,
@@ -142,14 +126,6 @@
     "workspaceRelativePath": "TLCloud/C++/POCO-170-XML.pdf",
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\C++\\POCO-170-XML.pdf",
     "relativePath": "C++/POCO-170-XML.pdf"
-  },
-  "TLCloud/_vault/Vaults_Architecture.md": {
-    "repository": "TLCloud",
-    "size": 1696,
-    "lastModified": "2025-12-02 14:09:58",
-    "workspaceRelativePath": "TLCloud/_vault/Vaults_Architecture.md",
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_vault\\Vaults_Architecture.md",
-    "relativePath": "_vault/Vaults_Architecture.md"
   },
   "TLCloud/Yarp.md": {
     "repository": "TLCloud",

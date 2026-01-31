@@ -30,6 +30,9 @@ $extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx")
 $ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules", ".devcontainer",
                  "_Container", "_SBOM", "_Scripts")
 
+# Define copy-only folders (files from these folders will be copied but never deleted from source)
+$copyOnlyFolders = @("_vault" )
+
 # Define mapping output file
 $mappingFile = Join-Path $workspaceDir "file-mapping.json"
 
@@ -135,16 +138,35 @@ if ($RemoveSources) {
     
     $totalFiles = $filesToProcess.Count
     $currentFile = 0
+    $totalCopyOnly = 0
     
     # Second pass: process each file with counter
     foreach ($fileInfo in $filesToProcess) {
         $currentFile++
-        $remaining = $totalFiles - $currentFile
+        $remaining = $totalFiles - $currentFile + 1
+        
+        # Check if file is in a copy-only folder
+        $isCopyOnly = $false
+        $mappingPath = $fileInfo.MappingPath
+        foreach ($copyOnlyFolder in $copyOnlyFolders) {
+            if ($mappingPath -like "*/$copyOnlyFolder/*" -or $mappingPath -like "*\$copyOnlyFolder\*") {
+                $isCopyOnly = $true
+                break
+            }
+        }
+        
+        if ($isCopyOnly) {
+            Write-Host "[$currentFile/$totalFiles] Found: $($fileInfo.MappingPath)" -ForegroundColor Cyan
+            Write-Host "  Source: $($fileInfo.SourcePath)" -ForegroundColor Gray
+            Write-Host "  [COPY-ONLY] This file is in a protected folder and will not be deleted" -ForegroundColor Magenta
+            Write-Host ""
+            $totalCopyOnly++
+            continue
+        }
         
         Write-Host "[$currentFile/$totalFiles] Found: $($fileInfo.MappingPath)" -ForegroundColor Cyan
         Write-Host "  Source: $($fileInfo.SourcePath)" -ForegroundColor Gray
-        Write-Host "  Remaining: $remaining files" -ForegroundColor Gray
-        $response = Read-Host "  Delete this source file? (Y/N)"
+        $response = Read-Host "  Delete this source file? [$remaining/$totalFiles remaining] (Y/N)"
         
         if ($response -eq 'Y' -or $response -eq 'y') {
             try {
@@ -166,6 +188,7 @@ if ($RemoveSources) {
     Write-Host "Remove sources completed!" -ForegroundColor Cyan
     Write-Host "Total files in mapping: $($existingMapping.Count)" -ForegroundColor Cyan
     Write-Host "Files deleted: $totalDeleted" -ForegroundColor Red
+    Write-Host "Copy-only files (protected): $totalCopyOnly" -ForegroundColor Magenta
     Write-Host "Files already removed: $totalNotFound" -ForegroundColor Gray
     Write-Host "========================================" -ForegroundColor Cyan
     
