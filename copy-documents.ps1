@@ -24,14 +24,14 @@ $sourceDirs = @(
 )
 
 # Define target extensions
-$extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx")
+$extensions = @("*.md", "*.docx", "*.pdf", "*.ppt", "*.pptx", "*.plantuml", "*.mermaid", "*.mmd")
 
 # Define ignored subdirectories (without leading slash)
 $ignoreFolders = @("out", "vcpkg_installed", "bin", "obj", ".git", "node_modules", ".devcontainer",
                  "_Container", "_SBOM", "_Scripts", "_docs_local" )
 
 # Define copy-only folders (files from these folders will be copied but never deleted from source)
-$copyOnlyFolders = @("_vault", "_docs_dev")
+$copyOnlyFolders = @("_vault", "_docs_dev", "_docs_public")
 
 # Define ignored file patterns (files matching these patterns will be ignored)
 $ignoreFiles = @("README.md")
@@ -284,7 +284,24 @@ foreach ($sourceDir in $sourceDirs) {
                         }
                         
                         Copy-Item -Path $file.FullName -Destination $destPath -Force
-                        Write-Host "  Copied: $sourceDirName\$relativePath" -ForegroundColor Gray
+                        
+                        # Check if file is in a copy-only folder and set as readonly
+                        $isCopyOnly = $false
+                        foreach ($copyOnlyFolder in $copyOnlyFolders) {
+                            if ($mappingPath -like "*/$copyOnlyFolder/*" -or $mappingPath -like "*\$copyOnlyFolder\*") {
+                                $isCopyOnly = $true
+                                break
+                            }
+                        }
+                        
+                        if ($isCopyOnly) {
+                            Set-ItemProperty -Path $destPath -Name IsReadOnly -Value $true
+                            Write-Host "  Copied (readonly): $sourceDirName\$relativePath" -ForegroundColor Magenta
+                        }
+                        else {
+                            Write-Host "  Copied: $sourceDirName\$relativePath" -ForegroundColor Gray
+                        }
+                        
                         $totalCopied++
                     }
                     

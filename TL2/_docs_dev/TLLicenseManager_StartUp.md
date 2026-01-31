@@ -1,53 +1,17 @@
-<!-- 
-REGENERATION PROMPT:
-Create a markdown in _docs about TLLicenseManager startup sequence and details about TPM usage. 
-Call it TLLicenseManager_StartUp.md
-
-SCOPE:
-- Complete startup sequence from main() through service initialization
-- Persistence layer initialization and secret storage architecture
-- TPM connection and key generation (SRK, signature keys)
-- TPM operations: persistent storage, cryptographic ops, NVRAM, hardware RNG
-- Platform-specific details (Windows/Linux/Container)
-- Security architecture and threat model
-- Troubleshooting common issues
-- Performance characteristics
-- Future enhancements
-
-KEY FILES TO REVIEW:
-- TLLicenseService/sources/src/Main.cpp (entry point)
-- TLLicenseService/sources/include/MainApp.h (POCO app lifecycle)
-- TLLicenseService/sources/src/PersistenceService.cpp (secret storage)
-- TLLicenseService/sources/src/LicenseService.cpp (key generation)
-- TLCrypt/sources/src/TPMService.cpp (TPM operations)
-- TLCrypt/sources/include/TPMService.h (TPM interface)
-- TLTpm/src/TpmDevice.cpp (platform-specific device access)
-- TLTpm/src/include/Tpm2.h (TPM 2.0 commands)
-- _docs/TPM_Docker_Kubernetes_Access.md (container deployment)
-
-UPDATE TRIGGERS:
-- Changes to startup sequence or initialization flow
-- New TPM operations added
-- Persistence format changes
-- Security model updates
-- Platform support additions
-- Configuration changes
-
-LAST UPDATED: January 31, 2026
--->
-
 # TLLicenseManager Startup Sequence and TPM Usage
 
 ## Overview
 
-TLLicenseManager is a TPM 2.0-backed licensing service that provides hardware-bound license management with cryptographic attestation. The application uses Trusted Platform Module (TPM) for secure key storage, hardware fingerprinting, and optional NVRAM-based persistence.
+TLLicenseManager is a TPM 2.0-backed licensing service that provides hardware-bound license management with cryptographic attestation. The application uses Trusted Platform Module (TPM) for secure key storage, hardware fingerprinting, and optional NVRAM-based persistence. TPM support can be enabled/disabled both at compile-time and runtime.
 
 **Key Features:**
-- Hardware-backed cryptographic operations
-- Deterministic key generation with reproducibility
-- Multi-platform support (Windows/Linux, physical/container)
+- Hardware-backed cryptographic operations using TPM 2.0
+- Deterministic key generation with reproducibility (seed-based)
+- Multi-platform support (Windows/Linux, physical/virtual/container)
 - REST and optional gRPC API interfaces
-- PCR-based boot state attestation
+- PCR-based NVRAM authentication (no password storage)
+- Runtime TPM disabling via `--no-tpm` flag
+- Container-aware initialization with Docker/Kubernetes volume tracking
 
 ---
 
@@ -57,19 +21,19 @@ TLLicenseManager is a TPM 2.0-backed licensing service that provides hardware-bo
 
 | Module | Purpose | Key Classes |
 |--------|---------|-------------|
-| **TLLicenseManager** | Executable wrapper | `main()`, `LicenseManagerApp` |
-| **TLLicenseService** | Business logic | `LicenseService`, `PersistenceService` |
+| **TLLicenseService** | Entry point & business logic | `main()`, `LicenseManagerApp`, `LicenseService`, `PersistenceService`, `ApplicationState` |
 | **TLCrypt** | TPM operations | `TLTPM_Service`, `TPMService.h` |
-| **TLTpm** | Low-level TPM 2.0 | `Tpm2`, `TpmDevice` |
+| **TLTpm** | Low-level TPM 2.0 | `Tpm2`, `TpmDevice` (Microsoft TSS.C++ wrapper) |
 | **TLProtocols** | API interfaces | `RESTService`, `GRPCService` |
 | **TLCommon** | Utilities | `TLConfiguration`, `TLLogger` |
+| **TLHardwareInfo** | Hardware detection | `TLHardwareService`, `TLFingerPrintService` |
 
 ---
 
 ## Complete Startup Sequence
 
 ### Phase 1: Main Entry Point
-**File:** `TLLicenseService/sources/src/Main.cpp`
+**File:** [TLLicenseService/sources/src/Main.cpp](TLLicenseService/sources/src/Main.cpp)
 
 ```
 main(argc, argv)
@@ -77,422 +41,1022 @@ main(argc, argv)
 │  └─ argh::parser cmdl(argc, argv, PREFER_PARAM_FOR_UNREG_OPTION)
 │     Supports: --help, --version, --config, --rest-port, --grpc-port,
 │               --log-level, --no-tpm
-│     Simulator: --tpm-host, --tpm-port
+│     Simulator (if TPM_SIMULATOR defined): --tpm-host, --tpm-port
 │
 ├─ Handle built-in commands
 │  ├─ --help / -h
 │  │  └─ Display usage, options, examples, and config paths
+│  │     Shows default directories for config and logs
 │  │     Exit with code 0
 │  │
 │  └─ --version / -v
-│     └─ Display version, build, platform, TPM mode, gRPC support
+│     └─ Display version info:
+│        - Version: APP_VERSION (e.g., "0.47")
+│        - Build: BUILD_NUMBER (e.g., "123")
+│        - Platform: PLATFORM_DISPLAY (e.g., "Windows" or "Linux")
+│        - TPM Support: "Enabled" or "Disabled" (compile-time TPM_ON flag)
+│        - TPM Mode: "Hardware" or "Simulator" (compile-time TPM_SIMULATOR flag)
+│        - gRPC Support: "Enabled" or "Disabled" (compile-time GRPC_Service flag)
 │        Exit with code 0
 │
 ├─ Validate command-line arguments
 │  ├─ Check for unknown flags/parameters
-│  │  └─ Display error and help if invalid
+│  │  └─ Compare against validFlags list
+│  │     If unknown: Display error in red + help, exit with code 1
 │  │
 │  ├─ Validate log-level values
 │  │  └─ Must be: trace|debug|info|warning|error|fatal
+│  │     If invalid: Display error + valid options, exit with code 1
 │  │
 │  └─ Validate port ranges (1-65535)
-│     └─ rest-port and grpc-port must be valid
+│     ├─ rest-port: Must be 1-65535
+│     └─ grpc-port: Must be 1-65535
+│        If invalid: Display error + help, exit with code 1
 │
 ├─ Initialize logging system
 │  ├─ TLLogger::InitLogging(LICENSE_SERVER_NAME)
+│  │  └─ Sets up file and console logging to default log directory
+│  │
 │  └─ Apply CLI log level override if specified
-│     └─ TLLogger::SetLogLevel(logLevel)
-│        └─ Log: "CLI: Log level set to '{level}'"
+│     └─ IF --log-level provided:
+│        ├─ TLLogger::SetLogLevel(logLevel)
+│        └─ Log: "CLI: Log level set to '{level}'" [debug]
 │
 ├─ Log application version and platform
 │  └─ [info] "--- Start TLLicenseManager (version) [build] on platform"
-│     Example: "--- Start TLLicenseManager (0.47) [123] on Windows"
+│     Example: "--- Start TLLicenseManager (0.47) [123] on Linux"
 │
-├─ Process --no-tpm flag early
+├─ Log CLI parameters processing
+│  └─ [debug] "Processing command-line arguments..."
+│
+├─ Process --no-tpm flag early (before initialization)
 │  ├─ IF --no-tpm provided:
 │  │  ├─ ApplicationState::DisableTPM()
-│  │  └─ Log: "CLI: --no-tpm flag detected, TPM will be disabled"
+│  │  │  └─ Sets tpmDisabledByCLI = true
+│  │  │     Sets tpmConnected = false
+│  │  │     Adds status: "TPM Connected" = "false (disabled by CLI)"
+│  │  │
+│  │  └─ Log: "CLI: --no-tpm flag detected, TPM will be disabled" [info]
 │  │
 │  └─ ELSE:
-│     └─ Log: "CLI: TPM enabled (no --no-tpm flag)"
+│     └─ Log: "CLI: TPM enabled (no --no-tpm flag)" [debug]
 │
 ├─ Log all CLI parameter overrides
-│  ├─ --rest-port: Log override value or "using default"
-│  ├─ --grpc-port: Log override value or "using default"
-│  ├─ --log-level: Already logged during init
-│  └─ --config: Log override path or "using default"
+│  ├─ --rest-port:
+│  │  ├─ IF provided: Log "CLI: REST port override = {port}" [info]
+│  │  └─ ELSE: Log "CLI: Using default REST port from config" [debug]
+│  │
+│  ├─ --grpc-port:
+│  │  ├─ IF provided: Log "CLI: gRPC port override = {port}" [info]
+│  │  └─ ELSE: Log "CLI: Using default gRPC port from config" [debug]
+│  │
+│  ├─ --log-level:
+│  │  ├─ IF provided: Log "CLI: Log level already set to {level}" [debug]
+│  │  └─ ELSE: Log "CLI: Using default log level" [debug]
+│  │
+│  └─ --config:
+│     ├─ IF provided: Log "CLI: Config file override = {path}" [info]
+│     └─ ELSE: Log "CLI: Using default config file location" [debug]
+│
+├─ Log configuration paths
+│  ├─ Log: "logPath: {path}" [debug]
+│  └─ Log: "configPath: {path}" [debug]
+│
+├─ IF FASTCRYPT defined:
+│  └─ Log: "FASTCRYPT" [warning]
+│     (Indicates smaller RSA keys for testing - not production-safe)
 │
 ├─ Check elevation status
 │  └─ ApplicationState::CheckElevation()
 │     └─ TLHardwareService::IsElevated()
-│        ├─ Windows: Check token elevation
-│        └─ Linux: Check UID == 0
+│        ├─ Windows: OpenProcessToken() + GetTokenInformation(TokenElevation)
+│        └─ Linux: Check if getuid() == 0
+│           Stores result in ApplicationState::applicationElevated
+│           Adds status: "Elevated" = "true" or "false"
 │
 └─ Launch POCO ServerApplication
-   └─ LicenseManagerApp.run(argc, argv)
+   ├─ Create LicenseManagerApp instance with parsed cmdl
+   └─ lmApp.run(argc, argv)
+      └─ POCO handles daemon/service setup and calls initialize() + main()
 ```
 
 **Requirements:**
-- ✅ Must run as Administrator (Windows) or root (Linux)
-- ✅ TPM access requires elevated privileges
+- ✅ Must run as Administrator (Windows) or root (Linux) for TPM access
+- ✅ Without elevation, TPM operations will fail (but app can still start in --no-tpm mode)
+- ✅ All CLI parameters validated before initialization begins
 
 **Logging Configuration:**
-Log levels (in order of verbosity): trace, debug, info, warning, error, fatal
+
+Log levels (in order of verbosity): **trace** < **debug** < **info** < **warning** < **error** < **fatal**
 
 Console output colors:
-- **trace** - Dark gray
-- **debug** - White
-- **info** - Blue
-- **warning** - Yellow
-- **error** - Red
-- **fatal** - Red
+- **trace** - Dark gray (most verbose, internal state changes)
+- **debug** - White (detailed diagnostics)
+- **info** - Blue (normal operations)
+- **warning** - Yellow (potential issues)
+- **error** - Red (failures that don't stop execution)
+- **fatal** - Red (critical failures)
 
-Command-line override:
+Command-line examples:
 ```bash
 # Set log level at startup (space-separated syntax)
 TLLicenseManager --log-level error
 
-# Multiple options
+# Multiple options (REST port + verbose logging)
 TLLicenseManager --rest-port 8080 --log-level debug
 
-# Disable TPM operations
+# Disable TPM operations (software-only mode)
 TLLicenseManager --no-tpm
 
 # Use custom config file
 TLLicenseManager --config /path/to/config.json
+
+# Simulator mode (if compiled with TPM_SIMULATOR)
+TLLicenseManager --tpm-host 192.168.1.10 --tpm-port 2321
 ```
 
 ---
 
 ### Phase 2: Application Initialization
-**File:** `TLLicenseService/sources/include/MainApp.h::initialize()`
+**File:** [TLLicenseService/sources/include/MainApp.h](TLLicenseService/sources/include/MainApp.h#L53)
 
 ```
-LicenseManagerApp::initialize()
+LicenseManagerApp::initialize(Application& self)
 ├─ Load configuration files
-│  └─ Searches for TLLicenseManager.json
+│  └─ loadConfiguration()
+│     └─ POCO searches for TLLicenseManager.json in:
+│        - Current directory
+│        - Default config directory (platform-specific)
+│        - Path specified by --config CLI argument
+│
+├─ ServerApplication::initialize(self)
+│  └─ Base class initialization (POCO framework)
 │
 ├─ ApplicationState::Initialize()
 │  ├─ Create JSON status document
+│  │  └─ rapidjson::Document with "LMSTATUS" root object
+│  │
 │  ├─ Record start time
-│  ├─ Store LM version (BUILD_NUMBER)
+│  │  └─ std::chrono::system_clock::now()
+│  │
+│  ├─ Store LM version
+│  │  └─ "LMVersion" = BUILD_NUMBER
+│  │
 │  ├─ Store log path
-│  └─ Check elevation status
+│  │  └─ "LogPath" = TLConfiguration::GetDefaultDirectory(Logs)
+│  │
+│  └─ Set isInitialized = true
 │
-├─ Apply CLI overrides to configuration
-│  ├─ Log: "Applying CLI overrides to configuration..."
-│  │
-│  ├─ IF --rest-port provided:
-│  │  ├─ SetValue("TrustedLicensing.REST.ServerPort", value)
-│  │  └─ Log: "Config updated: REST.ServerPort = {value}"
-│  │
-│  ├─ IF --grpc-port provided:
-│  │  ├─ SetValue("TrustedLicensing.gRPC.ServerPort", value)
-│  │  └─ Log: "Config updated: gRPC.ServerPort = {value}"
-│  │
-│  └─ IF --log-level provided:
-│     ├─ SetValue("TrustedLicensing.LicenseManager.LogLevel", value)
-│     └─ Log: "Config updated: LogLevel = {value}"
-│
-├─ Create LicenseService instance
-│  └─ std::make_shared<LicenseSerivce>()
+├─ Add platform info to status
+│  └─ AddSetLMStatus("Compiled for", PLATFORM_DISPLAY)
+│     Examples: "Windows", "Linux", "Linux (ARM)"
 │
 ├─ Detect runtime context
-│  ├─ config.getBool("application.runAsService") → "Running As Service"
-│  ├─ config.getBool("application.runAsDaemon") → "Running As Daemon"
+│  ├─ Windows:
+│  │  └─ IF config.getBool("application.runAsService", false):
+│  │     └─ status = "Running As Service"
 │  │
-│  ├─ Linux only: ApplicationState::IsRunningAsDaemon()
-│  │  └─ Auto-detect daemon mode:
-│  │     ├─ Check if no controlling terminal (!isatty)
-│  │     ├─ Check if parent is init (getppid() == 1)
-│  │     ├─ Check if session leader (getsid(0) == getpid())
-│  │     └─ If 2+ indicators true → "Running As Daemon (detected)"
+│  ├─ Linux:
+│  │  ├─ IF config.getBool("application.runAsDaemon", false):
+│  │  │  └─ status = "Running As Daemon"
+│  │  │
+│  │  └─ ELSE:
+│  │     └─ ApplicationState::IsRunningAsDaemon()
+│  │        └─ Auto-detect daemon mode using multi-factor check:
+│  │           ├─ Factor 1: !isatty(STDIN_FILENO) - No controlling terminal
+│  │           ├─ Factor 2: getppid() == 1 - Parent is init/systemd
+│  │           ├─ Factor 3: getsid(0) == getpid() - Is session leader
+│  │           │
+│  │           └─ IF 2+ factors true:
+│  │              └─ detectedDaemon = true
+│  │                 status = "Running As Daemon (detected)"
 │  │
-│  └─ Default: "Interactive Console"
+│  └─ Default (interactive):
+│     └─ status = "Interactive Console"
+│
+├─ Log runtime context
+│  └─ [debug] "{status}"
+│     Examples:
+│     - "Interactive Console"
+│     - "Running As Service" (Windows)
+│     - "Running As Daemon" (Linux configured)
+│     - "Running As Daemon (detected)" (Linux auto-detected)
 │
 └─ Store runtime context in ApplicationState
+   └─ AddSetLMStatus("RuntimeContext", status)
 ```
+
+**Runtime Context Detection Details:**
+
+| Platform | Method | Indicators | Example |
+|----------|--------|-----------|---------|
+| **Windows Interactive** | User launch | N/A | Double-click .exe, PowerShell |
+| **Windows Service** | Config flag | `application.runAsService` = true | `sc start TLLicenseManager` |
+| **Linux Interactive** | User launch | Terminal attached | `./TLLicenseManager` |
+| **Linux Daemon (Config)** | Config flag | `application.runAsDaemon` = true | Systemd with config |
+| **Linux Daemon (Detected)** | Auto-detection | 2+ of: no TTY, parent=init, session leader | Systemd, supervisord |
 
 ---
 
 ### Phase 3: Persistence Layer Initialization
-**File:** `TLLicenseService/sources/src/PersistenceService.cpp::Initialize()`
+**File:** [TLLicenseService/sources/src/PersistenceService.cpp](TLLicenseService/sources/src/PersistenceService.cpp#L63)
 
 ```
 PersistenceService::Initialize()
 ├─ 1. Create persistence directory
+│  └─ spConfiguration->CreateDefaultDirectory(TLDirectory::Persistence)
+│     Platform-specific paths:
+│     - Windows: C:\ProgramData\TrustedLicensing\Persistence\
+│     - Linux: /var/lib/TrustedLicensing/Persistence/
 │
 ├─ 2. Environment Detection
 │  ├─ ApplicationState::CheckContainer()
-│  │  └─ Detect: Docker, Kubernetes, Podman, LXC
+│  │  └─ Detect containerization (Linux only):
 │  │     Methods:
-│  │     - Check /.dockerenv
-│  │     - Check /run/.containerenv
-│  │     - Parse /proc/1/cgroup
+│  │     ├─ Method 1: Check /.dockerenv file exists → "Docker"
+│  │     ├─ Method 2: Check /run/.containerenv exists → "Podman"
+│  │     └─ Method 3: Parse /proc/1/cgroup for patterns:
+│  │        - "docker" → "Docker"
+│  │        - "kubepods" → "Kubernetes"
+│  │        - "containerd" → "Containerd"
+│  │        - "lxc" → "LXC"
+│  │     │
+│  │     └─ IF container detected AND Docker socket available:
+│  │        ├─ Connect to /var/run/docker.sock
+│  │        ├─ Read hostname from /etc/hostname → Container ID
+│  │        ├─ GET /containers/{id}/json
+│  │        └─ Extract and store:
+│  │           - ContainerID (short hash)
+│  │           - ContainerName (e.g., "/tl-service")
+│  │           - ContainerImage (e.g., "trustedlicensing:latest")
+│  │           - ContainerStatus (e.g., "running")
+│  │           - VolumeMountCount
+│  │           - VolumeMount0_Name, _Type, _Source, _Destination, _ReadWrite
+│  │           - VolumeMount1_... (for each mount)
+│  │     │
+│  │     Logs:
+│  │     - [debug] "Containerized => true/false"
+│  │     - [debug] "ContainerEnvironment => {type}"
+│  │     - [debug] "Container ID: {id}"
+│  │     - [debug] "Volume Mount 0: /app/data <- host_path [bind]"
 │  │
 │  ├─ ApplicationState::CheckVirtualMachine()
 │  │  └─ TLHardwareService::GetVMState()
-│  │     - VMware, Hyper-V, KVM, Xen detection
+│  │     Detects virtualization via:
+│  │     - Windows: WMI queries
+│  │     - Linux: /sys/class/dmi/id/* files, cpuid checks
+│  │     Possible values: VMware, Hyper-V, KVM, Xen, VirtualBox, None
+│  │     Logs: [trace] "Virtual Machine Status Check"
 │  │
-│  └─ ApplicationState::CheckTPM() [if TPM_ON]
-│     ├─ IF TPM disabled by --no-tpm:
-│     │  └─ Log: "TPM check skipped (disabled by --no-tpm)"
-│     │     Skip TPM initialization
+│  └─ ApplicationState::CheckTPM()
+│     ├─ IF tpmDisabledByCLI (--no-tpm flag was used):
+│     │  └─ Skip TPM check entirely
+│     │     Status: "TPM Connected" = "false (disabled by CLI)"
+│     │     No error logged (intentional)
 │     │
-│     └─ ELSE:
-│        ├─ Create TLTPM_Service instance
-│        ├─ Check TPM 2.0 availability
-│        └─ Update ApplicationState
-│           ├─ IF container && TPM not connected:
-│           │  └─ Log warning (expected in containers)
-│           │
-│           └─ IF not container && TPM not connected:
-│              └─ Log: "TPM not available (may be disabled or missing)"
+│     ├─ ELSE IF TPM_ON (compiled with TPM support):
+│     │  ├─ Status: "TPM available" = "in binary"
+│     │  ├─ Create TLTPM_Service instance to test connection
+│     │  ├─ IF TPM connection succeeds:
+│     │  │  └─ Status: "TPM Connected" = "true"
+│     │  │     tpmConnected = true
+│     │  │
+│     │  └─ IF TPM connection fails:
+│     │     ├─ tpmConnected = false
+│     │     ├─ Status: "TPM Connected" = "false"
+│     │     │
+│     │     └─ IF running in container:
+│     │        └─ [warning] "PersistenceService - TPM not available (may be disabled or missing)"
+│     │           (Expected in containers without TPM passthrough)
+│     │     
+│     │     └─ ELSE (physical/VM without container):
+│     │        └─ [warning] "PersistenceService - TPM not available (may be disabled or missing)"
+│     │           (Unexpected, but not fatal - allows software-only operation)
+│     │
+│     └─ ELSE (!TPM_ON - compiled without TPM):
+│        ├─ Status: "TPM available" = "binary unavailable"
+│        ├─ Status: "TPM Connected" = "false (not compiled in)"
+│        └─ [info] "PersistenceService - TPM not compiled in binary"
 │
 ├─ 3. Persistence File Management
 │  ├─ Check if persistence.bin exists
+│  │  └─ PersistenceFileName = "{PersistenceDir}/persistence.bin"
 │  │
 │  ├─ IF NOT EXISTS (First-time initialization):
+│  │  ├─ PersistenceFileWritten = true
+│  │  │
 │  │  ├─ CreateRandomString(15KB-75KB)
-│  │  │  └─ Generate random binary data container
+│  │  │  └─ boost::mt19937 RNG with random_device seed
+│  │  │     Generate random bytes (0-255) into std::vector<char>
+│  │  │     Purpose: Steganographic container for secret hiding
+│  │  │     Size randomized to prevent fingerprinting
 │  │  │
-│  │  ├─ Connect to TPM
-│  │  │  └─ spTPM->Randomize(16) → TPM_AUTH
-│  │  │     └─ Hardware RNG (cryptographically secure)
+│  │  ├─ Generate and embed secrets at fixed positions:
+│  │  │  ├─ Position 100 (variable length): Vault ID + filename
+│  │  │  │  └─ vaultID = AESCrypt::GenerateIV() (32 hex chars)
+│  │  │  │     Value: "{vaultID}.vault.bin" (e.g., "a3b2...f9.vault.bin")
+│  │  │  │
+│  │  │  ├─ Position 200 (32 chars): AES Vault Key
+│  │  │  │  └─ aesKeyGen = AESCrypt::GenerateIV()
+│  │  │  │
+│  │  │  ├─ Position 250 (32 chars): AES Vault IV
+│  │  │  │  └─ aesIVCGen = AESCrypt::GenerateIV()
+│  │  │  │
+│  │  │  ├─ Position 400 (16 bytes): TPM_AUTH
+│  │  │  │  └─ IF ApplicationState::TPMConnected():
+│  │  │  │     └─ spTPM->Randomize(16).templateValue
+│  │  │  │        (Hardware RNG from TPM)
+│  │  │  │
+│  │  │  └─ Position 450 (16 bytes): TPM_SEED
+│  │  │     └─ IF ApplicationState::TPMConnected():
+│  │  │        └─ spTPM->Randomize(16).templateValue
+│  │  │           (Hardware RNG from TPM)
 │  │  │
-│  │  ├─ Embed secrets at fixed positions:
-│  │  │  ├─ Position 100: Vault ID + filename
-│  │  │  ├─ Position 200: AES Vault Key (32 chars)
-│  │  │  ├─ Position 250: AES Vault IV (32 chars)
-│  │  │  ├─ Position 400: TPM_AUTH (16 bytes)
-│  │  │  └─ Position 450: TPM_SEED (16 bytes)
+│  │  ├─ Encrypt entire container with AES-256
+│  │  │  └─ spAEShc->AESEncrypt(PersistenceCoreData)
+│  │  │     Key: AES_KEY_PERSISTENCE_LOCAL (hardcoded)
+│  │  │     IV:  AES_IVC_PERSISTENCE_LOCAL (hardcoded)
 │  │  │
-│  │  └─ Encrypt with AES (hardcoded key) → persistence.bin
+│  │  └─ WritePersistenceCoreFile()
+│  │     └─ TLCommon::Files::SaveData(persistence.bin, encrypted)
 │  │
 │  └─ ELSE (Warm start):
+│     ├─ PersistenceFileWritten = false
+│     │
 │     └─ ReadPersistenceCoreFile()
-│        └─ AES-decrypt persistence.bin
+│        ├─ Read ciphertext from persistence.bin
+│        ├─ AES-decrypt with hardcoded key/IV
+│        └─ Store plaintext in PersistenceCoreData (in-memory)
 │
-├─ 4. Extract Secrets
+├─ 4. Extract Secrets from Memory
+│  ├─ VaultFileName = ReadValue(position 100, variable length)
+│  │  └─ Extract: "{hexID}.vault.bin"
+│  │
+│  ├─ AESGenKey = ReadValue(position 200, 64 chars)
+│  │  └─ 32 bytes as 64 hex characters
+│  │
+│  ├─ AESGenIV = ReadValue(position 250, 64 chars)
+│  │  └─ 32 bytes as 64 hex characters
+│  │
 │  ├─ TPMAuth = ReadValue(position 400, 16 bytes)
-│  ├─ TPMSeed = ReadValue(position 450, 16 bytes)
-│  ├─ AESGenKey = ReadValue(position 200)
-│  └─ AESGenIV = ReadValue(position 250)
+│  │  └─ Raw binary (not hex encoded)
+│  │
+│  └─ TPMSeed = ReadValue(position 450, 16 bytes)
+│     └─ Raw binary (not hex encoded)
 │
 └─ 5. Validation
-   ├─ Verify AES keys are hexadecimal
-   ├─ Verify TPM auth/seed exist
+   ├─ Verify AES keys are valid hexadecimal
+   │  └─ TLCommon::Conversion::isHexadecimal(AESGenKey)
+   │     TLCommon::Conversion::isHexadecimal(AESGenIV)
+   │     IF invalid:
+   │     - [error] "PersistenceService - key initialization failure!"
+   │     - AddLMStatusError("PersistenceService", "key initialization failure")
+   │     - retval = false
+   │
+   ├─ Verify TPM auth/seed exist (if TPM expected)
+   │  └─ IF TPMAuth.empty() OR TPMSeed.empty():
+   │     - [error] "PersistenceService - TPM initialization failure!"
+   │     - AddLMStatusError("PersistenceService", "TPM initialization failure")
+   │     - retval = false
+   │
    ├─ Verify vault filename valid
-   └─ Create AESCrypt instance for vault operations
+   │  └─ IF !VaultFileName.find("vault.bin"):
+   │     - [error] "PersistenceService - vault initialization failure!"
+   │     - AddLMStatusError("PersistenceService", "vault initialization failure")
+   │     - retval = false
+   │
+   ├─ Create AESCrypt instance for vault operations
+   │  └─ spAESvault = std::make_unique<AESCrypt>(AESGenKey, AESGenIV)
+   │
+   └─ IF all validations pass:
+      ├─ [info] "PersistenceService - initialized!"
+      ├─ AddSetLMStatus("PersistenceService", "initialized")
+      └─ return true
 ```
 
 **Security Model:**
-- Random container (15-75 KB) provides steganographic hiding
-- Secrets at fixed positions (obfuscation, not security)
-- AES encryption (hardcoded key: `AES_KEY_PERSISTENCE_LOCAL`)
-- Filesystem permissions (requires elevated access)
+- **Random container (15-75 KB)**: Provides steganographic hiding of secrets
+- **Fixed positions**: Implementation detail (obfuscation, not security)
+- **AES encryption**: Hardcoded key protects persistence.bin at rest
+- **Filesystem permissions**: Requires elevated access to read/write
+- **TPM-derived secrets**: TPM_AUTH and TPM_SEED use hardware RNG (non-predictable)
+- **Vault keys**: AESGenKey/AESGenIV are software-generated but encrypted
+
+**Purpose of Secrets:**
+| Secret | Purpose | Source |
+|--------|---------|--------|
+| **VaultFileName** | Identifies vault.bin | Software RNG |
+| **AESGenKey** | Encrypts vault.bin | Software RNG |
+| **AESGenIV** | Vault encryption IV | Software RNG |
+| **TPM_AUTH** | TPM handle authentication | TPM Hardware RNG |
+| **TPM_SEED** | Deterministic key generation | TPM Hardware RNG |
+
+**File Dependencies:**
+```
+persistence.bin (encrypted)
+    └─ Contains: VaultFileName, AESGenKey, AESGenIV, TPM_AUTH, TPM_SEED
+       └─ Used to decrypt ─┐
+                            ↓
+                      vault.bin (encrypted)
+                          └─ Contains: LocalPublicKey, LocalPrivateKey, SRK (public)
+```
 
 ---
 
 ### Phase 4: TPM Initialization
-**File:** `TLCrypt/sources/src/TPMService.cpp::TLTPM_Service()`
+**File:** [TLCrypt/sources/src/TPMService.cpp](TLCrypt/sources/src/TPMService.cpp#L12)
 
 ```
-TLTPM_Service::Constructor
+TLTPM_Service::Constructor()
+├─ Initialize TPM status
+│  └─ tpmStatus = std::make_unique<TPMStatus>()
+│     Fields: IsConnected (bool), Message (string)
+│
 ├─ 1. Check Elevation
-│  └─ TLHardwareService::IsElevated()
-│     └─ Required for TPM access
+│  └─ isElevated = TLHardwareService::IsElevated()
+│     ├─ Windows: OpenProcessToken() + GetTokenInformation(TokenElevation)
+│     └─ Linux: getuid() == 0
+│        IF not elevated:
+│        - [error] "TPM requires elevated rights"
+│        - Return early (device = nullptr, IsConnected = false)
 │
 ├─ 2. Select TPM Device
-│  ├─ IF TPM_SIMULATOR:
-│  │  └─ TpmTcpDevice(hostname, port)
-│  │     └─ Connects to MS TPM Simulator
+│  ├─ IF TPM_SIMULATOR (compile-time flag):
+│  │  ├─ Read environment or defaults:
+│  │  │  - hostname = TPM_DEVICE (default: "localhost")
+│  │  │  - port = TPM_PORT (default: "2321")
+│  │  │
+│  │  ├─ device = new TpmTcpDevice(hostname, port)
+│  │  │  └─ TCP socket connection to MS TPM Simulator
+│  │  │
+│  │  └─ [trace] "TPM_SIMULATOR START {hostname}:{port}"
 │  │
-│  └─ ELSE (Production):
-│     ├─ Windows: TpmTbsDevice()
-│     │  └─ Uses TBS (TPM Base Services)
+│  └─ ELSE (Production hardware TPM):
+│     ├─ device = new TpmTbsDevice()
+│     │  └─ Platform-specific device access:
+│     │     ├─ Windows: TBS (TPM Base Services) API
+│     │     │  └─ Uses Tbsi.dll: Tbsi_Context_Create()
+│     │     │     Provides kernel-level TPM resource management
+│     │     │
+│     │     └─ Linux: Device access priority (tries in order):
+│     │        1. /dev/tpm0 - Direct character device
+│     │        2. TCTI abrmd - Resource manager daemon (socket)
+│     │        3. /dev/tpmrm0 - Kernel resource manager (PREFERRED)
+│     │        4. User-mode TRM - Socket 127.0.0.1:2323
 │     │
-│     └─ Linux: TpmTbsDevice()
-│        └─ Tries in order:
-│           1. /dev/tpm0 (direct access)
-│           2. TCTI abrmd (resource manager daemon)
-│           3. /dev/tpmrm0 (kernel RM, preferred)
-│           4. User-mode TRM (socket 127.0.0.1:2323)
+│     └─ [trace] "TPM Start"
 │
 ├─ 3. Connect to TPM
-│  └─ device->Connect()
-│     └─ Establishes communication channel
+│  ├─ [trace] "Connect to TPM"
+│  │
+│  ├─ IF !device->Connect():
+│  │  ├─ device = nullptr
+│  │  ├─ tpmStatus->IsConnected = false
+│  │  ├─ tpmStatus->Message = "Could not connect to TPM."
+│  │  └─ [debug] "Could not connect to TPM."
+│  │     Return early (TPM not available)
+│  │
+│  └─ ELSE (connection successful):
+│     ├─ tpmStatus->Message = "TPM device found."
+│     ├─ tpmStatus->IsConnected = true
+│     └─ [debug] "TPM device found."
 │
 ├─ 4. Configure TPM Context
 │  ├─ tpm._SetDevice(*device)
+│  │  └─ Associate Tpm2 object with device
 │  │
-│  └─ IF Simulator:
+│  └─ IF IsUsingSimulator:
 │     ├─ device->PowerCycle()
+│     │  └─ Send TPM power commands (simulator only)
+│     │
 │     └─ tpm.Startup(TPM_SU::CLEAR)
+│        └─ TPM2_Startup command
+│           Note: NOT called for hardware TPM (already started by platform)
 │
 └─ 5. Initialize TPM Capabilities
    └─ TpmConfig::Init(tpm)
-      ├─ Query implemented algorithms
-      │  └─ GetCapability(TPM_CAP::ALGS)
+      ├─ [trace] "Init TPM"
       │
-      ├─ Query hash algorithms
-      │  └─ Filter for hash capability
+      ├─ Query implemented algorithms
+      │  └─ tpm.GetCapability(TPM_CAP::ALGS, ...)
+      │     Returns: List of TPM_ALG_ID values
+      │     Examples: RSA, AES, SHA256, HMAC, ECC
+      │
+      ├─ Filter hash algorithms
+      │  └─ For each algorithm with TPMA_ALGORITHM::hash attribute
+      │     Store available hash functions
       │
       └─ Query implemented commands
-         └─ GetCapability(TPM_CAP::COMMANDS)
+         └─ tpm.GetCapability(TPM_CAP::COMMANDS, ...)
+            Returns: Bitmap of supported TPM 2.0 commands
+            Used for feature detection (e.g., NV_Certify available?)
 ```
 
 **Platform-Specific Behavior:**
 
-| Platform | Device | Sessions | Notes |
-|----------|--------|----------|-------|
-| **Windows** | TBS API | HMAC sessions used | Always available |
-| **Linux** | /dev/tpmrm0 | Optional sessions | Preferred for concurrency |
-| **Simulator** | TCP socket | Full control | Port 2321 default |
-| **Container** | Host passthrough | Host device | Sees host PCRs |
+| Platform | Device Path | Access Method | Sessions | Resource Manager | Notes |
+|----------|-------------|---------------|----------|------------------|-------|
+| **Windows** | TBS API | Tbsi.dll | HMAC sessions used | Built-in (TBS) | Always available |
+| **Linux /dev/tpm0** | Direct char device | open() + read/write | Optional | None | Root only, single process |
+| **Linux /dev/tpmrm0** | Kernel RM | open() + read/write | Optional | Kernel (v4.12+) | **PREFERRED** - concurrent access |
+| **Linux abrmd** | TCTI daemon | D-Bus/socket | Optional | Userspace daemon | Legacy, being phased out |
+| **Simulator** | TCP socket | localhost:2321 | Full control | None | Development/testing only |
+| **Container** | Host passthrough | Same as host | Depends on host | Host's manager | Sees host PCR values |
+
+**Linux Resource Manager Benefits:**
+- ✅ Multiple processes can access TPM simultaneously
+- ✅ Automatic session management and context swapping
+- ✅ Transient object cleanup (prevents handle exhaustion)
+- ✅ No explicit session creation needed for most operations
+- ⚠️ Not available on kernels < 4.12 (requires fallback to /dev/tpm0)
+
+**TPM Connection Error Handling:**
+```cpp
+try {
+    if (!device || !device->Connect()) {
+        device = nullptr;
+        tpmStatus->IsConnected = false;
+        tpmStatus->Message = "Could not connect to TPM.";
+        BOOST_LOG_TRIVIAL(debug) << tpmStatus->Message;
+    } else {
+        tpmStatus->Message = "TPM device found.";
+        tpmStatus->IsConnected = true;
+        // Continue with initialization...
+    }
+} catch (const std::exception& ex) {
+    BOOST_LOG_TRIVIAL(error) << ex.what();
+    // TPM initialization failed, but app continues (software-only mode)
+}
+```
+
+**Destructor Cleanup:**
+```cpp
+TLTPM_Service::~TLTPM_Service()
+{
+    // Flush all transient handles (persistent handles remain)
+    for (const auto& mapHandle : tpmKeyHandles) {
+        tpm._AllowErrors().FlushContext(mapHandle.second);
+        auto rc = EnumToStr(tpm._GetLastResponseCode());
+    }
+    
+    if (device) {
+        device->Close();
+        delete device;
+    }
+    
+    BOOST_LOG_TRIVIAL(trace) << "TPM closed";
+}
+```
 
 ---
 
 ### Phase 5: Key Generation
-**File:** `TLLicenseService/sources/src/LicenseService.cpp::Start()`
+**File:** [TLLicenseService/sources/src/LicenseService.cpp](TLLicenseService/sources/src/LicenseService.cpp#L12)
 
 ```
-LicenseService::Start(persistence)
-├─ Constructor: Conditional TPM Service Creation
+LicenseService::Constructor
+├─ [trace] "LicenseService::LicenseService()"
+│
+├─ Initialize configuration
+│  └─ spConfiguration = std::make_unique<TLConfiguration>()
+│
+├─ Conditional TPM Service Creation
 │  ├─ IF ApplicationState::TPMConnected():
-│  │  ├─ spTPMService = std::make_unique<TLTPM_Service>()
-│  │  └─ Log: "Initializing TPM service"
+│  │  ├─ [debug] "Initializing TPM service"
+│  │  └─ spTPMService = std::make_unique<TLTPM_Service>()
+│  │     └─ Creates TPM connection (see Phase 4)
 │  │
 │  └─ ELSE:
-│     └─ Log: "TPM service not initialized (TPM disabled or not connected)"
-│        spTPMService = nullptr (prevents TPM access when --no-tpm used)
+│     ├─ [debug] "TPM service not initialized (TPM disabled or not connected)"
+│     └─ spTPMService = nullptr
+│        Purpose: Prevents TPM access attempts when:
+│        - --no-tpm flag was used
+│        - TPM not available in container
+│        - TPM hardware missing/disabled
 │
-├─ 1. Check Vault Existence
-│  └─ IF vault.bin NOT EXISTS:
+└─ Set vault file path
+   └─ vaultFileName = "{PersistenceDir}/vault.bin"
+
+LicenseService::Start(spPersistence)
+├─ [trace] "LicenseService::Start"
 │
-├─ 2. Generate Local RSA Keys (Software)
-│  ├─ RSA 2048-bit (or smaller if FASTCRYPT)
-│  ├─ Public key → LocalPublicKey
-│  └─ Private key → LocalPrivateKey
+├─ Store persistence service reference
+│  └─ spPersistence = persistence
 │
-├─ 3. Generate TPM Keys (Hardware)
-│  └─ IF (IsElevated() && TPMConnected() && spTPMService):
-│     │
-│     ├─ Create Storage Root Key (SRK)
-│     │  ├─ Template:
-│     │  │  └─ TPMT_PUBLIC(
-│     │  │       algorithm: RSA 2048,
-│     │  │       scheme: OAEP-SHA256,
-│     │  │       attributes: decrypt | restricted | fixedTPM,
-│     │  │       seed: TPM_SEED (from persistence.bin)
-│     │  │     )
-│     │  │
-│     │  ├─ tpm.CreatePrimary(
-│     │  │     primaryHandle: TPM_RH::OWNER,
-│     │  │     auth: TPM_AUTH,
-│     │  │     template: srkTemplate,
-│     │  │     seed: TPM_SEED  ← Deterministic!
-│     │  │   )
-│     │  │  └─ Same seed → Same key pair
-│     │  │     Allows key recovery without exposing private key
-│     │  │
-│     │  ├─ tpm.EvictControl(TPM_RH::OWNER, handle, 0x81000835)
-│     │  │  └─ Persist to NV handle (slot 2101)
-│     │  │
-│     │  └─ CreatePublicKeyPEM(StorageRootKey)
-│     │     └─ Export public key as X.509 PEM
-│     │
-│     └─ Create Signature Key (Optional)
-│        └─ Similar process → NV handle 0x81000836 (slot 2102)
+├─ Get persistence data
+│  └─ persistenceData = spPersistence->GetPersistenceData()
+│     Fields: TPMAuth, TPMSeed, PersistenceFileWritten
 │
-├─ 4. Store Keys in Vault
-│  ├─ Serialize to JSON:
-│  │  {
-│  │    "LocalPublicKey": "-----BEGIN PUBLIC KEY-----...",
-│  │    "LocalPrivateKey": "-----BEGIN PRIVATE KEY-----...",
-│  │    "SRK": "-----BEGIN PUBLIC KEY-----..."
-│  │  }
+├─ Create JSON object mapper
+│  └─ jsonObjectMapper = TLCommon::Serialization::CreateObjectMapper()
+│     (oatpp JSON serialization)
+│
+├─ Check if vault.bin exists
 │  │
-│  ├─ Encrypt with AES (keys from persistence.bin)
-│  └─ Write vault.bin
+│  ├─ IF vault.bin EXISTS (Warm start):
+│  │  ├─ [debug] "{vaultFileName} found"
+│  │  │
+│  │  ├─ Read and decrypt vault
+│  │  │  └─ vaultData = spPersistence->ReadVaultFile()
+│  │  │     └─ AES decrypt with AESGenKey/AESGenIV
+│  │  │
+│  │  ├─ Deserialize JSON
+│  │  │  └─ wrapperlicenseManagerKeys = 
+│  │  │        jsonObjectMapper->readFromString<LicenseManagerKeys>(vaultData)
+│  │  │
+│  │  └─ Validate SRK (if TPM connected)
+│  │     └─ IF ApplicationState::TPMConnected():
+│  │        └─ IF wrapperlicenseManagerKeys->SRK == nullptr:
+│  │           ├─ [error] "No Storage Root Key"
+│  │           ├─ AddLMStatusError("LicenseService", "No Storage Root Key")
+│  │           └─ return (fatal error)
+│  │
+│  └─ ELSE vault.bin NOT EXISTS (Cold start / First-time initialization):
+│     │
+│     ├─ Validate persistence state
+│     │  └─ IF !persistenceData.PersistenceFileWritten:
+│     │     ├─ [error] "LicenseService::Start Inconsistent data"
+│     │     ├─ AddLMStatusError("LicenseService", "Inconsistent data")
+│     │     └─ return (fatal error)
+│     │
+│     ├─ [debug] "{vaultFileName} not found"
+│     ├─ [debug] "Generate Keys"
+│     │
+│     ├─ 1. Generate Local RSA Keys (Software)
+│     │  ├─ localKeys = RSACrypt::GenerateKeys()
+│     │  │  └─ Uses Botan library:
+│     │  │     ├─ Algorithm: RSA
+│     │  │     ├─ Key size: 2048 bits (production)
+│     │  │     │           1024 bits (if FASTCRYPT defined - testing only)
+│     │  │     ├─ Public exponent: 65537
+│     │  │     └─ Format: PEM (PKCS#8 for private, X.509 SubjectPublicKeyInfo for public)
+│     │  │
+│     │  ├─ IF localKeys.HasError():
+│     │  │  ├─ [error] "LicenseService::Start Failed to generate keys: {error}"
+│     │  │  ├─ AddLMStatusError("LicenseService", "Failed to generate keys")
+│     │  │  └─ return
+│     │  │
+│     │  ├─ [debug] "Keys generated successfully"
+│     │  ├─ [debug] "Public key length: {length}"
+│     │  └─ [debug] "Private key length: {length}"
+│     │
+│     ├─ Validate key generation
+│     │  └─ IF localKeys.publicKeyPEM.empty() OR localKeys.privateKeyPEM.empty():
+│     │     ├─ [error] "LicenseService::Start Generated keys are empty"
+│     │     ├─ AddLMStatusError("LicenseService", "Generated keys are empty")
+│     │     └─ return
+│     │
+│     ├─ Create DTO for key storage
+│     │  └─ dto_LicenseManagerKeys = LicenseManagerKeys::createShared()
+│     │     └─ dto_LicenseManagerKeys->LocalPublicKey = localKeys.publicKeyPEM
+│     │        dto_LicenseManagerKeys->LocalPrivateKey = localKeys.privateKeyPEM
+│     │
+│     ├─ 2. Generate TPM Keys (Hardware-bound)
+│     │  └─ IF ApplicationState::IsElevated():
+│     │     │
+│     │     └─ IF ApplicationState::TPMConnected():
+│     │        │
+│     │        ├─ Ensure TPM service exists
+│     │        │  └─ IF !spTPMService:
+│     │        │     ├─ [debug] "Initializing TPM service for key generation"
+│     │        │     └─ spTPMService = std::make_unique<TLTPM_Service>()
+│     │        │
+│     │        ├─ Create Storage Root Key (SRK)
+│     │        │  ├─ Call: tpmSRK = spTPMService->InitStorageRootKey(
+│     │        │  │           auth: String2ByteVec(psd.TPMAuth),
+│     │        │  │           seed: String2ByteVec(psd.TPMAuth),  ← Note: Uses auth as seed
+│     │        │  │           persistence: PERSISTENCE_SRK_EVICT  (value: 1000)
+│     │        │  │        )
+│     │        │  │
+│     │        │  ├─ Inside InitStorageRootKey():
+│     │        │  │  ├─ Create SRK template:
+│     │        │  │  │  └─ TPMT_PUBLIC(
+│     │        │  │  │       nameAlg: SHA256,
+│     │        │  │  │       objectAttributes:
+│     │        │  │  │         decrypt | fixedParent | fixedTPM |
+│     │        │  │  │         sensitiveDataOrigin | userWithAuth,
+│     │        │  │  │       authPolicy: null (uses auth value, not policy),
+│     │        │  │  │       parameters: TPMS_RSA_PARMS(
+│     │        │  │  │         symmetric: null,
+│     │        │  │  │         scheme: OAEP-SHA256,
+│     │        │  │  │         keyBits: 2048,
+│     │        │  │  │         exponent: 65537
+│     │        │  │  │       ),
+│     │        │  │  │       unique: TPM2B_PUBLIC_KEY_RSA(seed)
+│     │        │  │  │     )
+│     │        │  │  │
+│     │        │  │  ├─ Create sensitive area:
+│     │        │  │  │  └─ TPMS_SENSITIVE_CREATE(auth, null)
+│     │        │  │  │
+│     │        │  │  ├─ [trace] "Create StorageRootKey"
+│     │        │  │  │
+│     │        │  │  ├─ Generate primary key:
+│     │        │  │  │  └─ rsaKey = tpm._AllowErrors().CreatePrimary(
+│     │        │  │  │       hierarchy: TPM_RH::OWNER,
+│     │        │  │  │       inSensitive: sensCreate,
+│     │        │  │  │       inPublic: srkTemplate,
+│     │        │  │  │       outsideInfo: null,
+│     │        │  │  │       creationPCR: null
+│     │        │  │  │     )
+│     │        │  │  │     └─ Returns: handle, outPublic, ...
+│     │        │  │  │        **Key point**: Same auth + seed = Same key pair!
+│     │        │  │  │
+│     │        │  │  ├─ Check for errors:
+│     │        │  │  │  └─ IF !tpm._LastCommandSucceeded():
+│     │        │  │  │     ├─ [error] "Code: {TPMRC}"
+│     │        │  │  │     ├─ [error] "TPMError {message}"
+│     │        │  │  │     └─ return error
+│     │        │  │  │
+│     │        │  │  ├─ Set handle auth:
+│     │        │  │  │  └─ rsaKey.handle.SetAuth(tpmAuth)
+│     │        │  │  │
+│     │        │  │  ├─ Store in memory maps:
+│     │        │  │  │  ├─ tpmKeyHandles["SRK"] = rsaKey.handle
+│     │        │  │  │  └─ publicKeys["SRK"] = rsaKey.outPublic
+│     │        │  │  │
+│     │        │  │  ├─ Make key persistent:
+│     │        │  │  │  ├─ persistentHandle = TPM_HANDLE::Persistent(1000)
+│     │        │  │  │  │  └─ Converts slot number to TPM handle:
+│     │        │  │  │  │     0x81000000 + 1000 = 0x810003E8
+│     │        │  │  │  │
+│     │        │  │  │  ├─ Delete any existing key at this slot:
+│     │        │  │  │  │  └─ tpm._AllowErrors().EvictControl(
+│     │        │  │  │  │       TPM_RH::OWNER, persistentHandle, persistentHandle)
+│     │        │  │  │  │
+│     │        │  │  │  ├─ persistentHandle.SetAuth(tpmAuth)
+│     │        │  │  │  │
+│     │        │  │  │  └─ Persist the new key:
+│     │        │  │  │     └─ tpm.EvictControl(
+│     │        │  │  │          TPM_RH::OWNER, rsaKey.handle, persistentHandle)
+│     │        │  │  │        └─ Key now survives reboots at handle 0x810003E8
+│     │        │  │  │
+│     │        │  │  └─ return success
+│     │        │  │
+│     │        │  ├─ IF tpmSRK.Success():
+│     │        │  │  ├─ Export public key as PEM:
+│     │        │  │  │  └─ dto_LicenseManagerKeys->SRK = 
+│     │        │  │  │        spTPMService->CreatePublicKeyPEM("StorageRootKey")
+│     │        │  │  │     └─ Uses Botan to convert TPM public key to X.509 PEM format
+│     │        │  │  │
+│     │        │  │  └─ Note: Private key NEVER leaves TPM chip
+│     │        │  │
+│     │        │  └─ ELSE (SRK creation failed):
+│     │        │     ├─ [error] "LicenseService::Start tpmSRK: {error}"
+│     │        │     └─ AddLMStatusError("LicenseService tpmSRK: ", error)
+│     │        │
+│     │        └─ ELSE (TPM not connected):
+│     │           └─ [debug] "LicenseService::Start TPM not connected"
+│     │
+│     │     └─ ELSE (not elevated):
+│     │        ├─ [debug] "LicenseService::Start not elevated"
+│     │        └─ AddLMStatusError("LicenseService", "not elevated")
+│     │
+│     ├─ 3. Serialize and encrypt vault
+│     │  ├─ vaultData = jsonObjectMapper->writeToString(dto_LicenseManagerKeys)
+│     │  │  └─ JSON format:
+│     │  │     {
+│     │  │       "LocalPublicKey": "-----BEGIN PUBLIC KEY-----\n...",
+│     │  │       "LocalPrivateKey": "-----BEGIN PRIVATE KEY-----\n...",
+│     │  │       "SRK": "-----BEGIN PUBLIC KEY-----\n..."  (if TPM connected)
+│     │  │     }
+│     │  │
+│     │  ├─ Write encrypted vault:
+│     │  │  └─ spPersistence->WriteVaultFile(vaultData)
+│     │  │     └─ AES-256 encrypt with AESGenKey/AESGenIV from persistence.bin
+│     │  │
+│     │  └─ Write persistence file:
+│     │     └─ spPersistence->WritePersistenceCoreFile()
+│     │        (Re-encrypt persistence.bin with any updates)
+│     │
+│     └─ 4. Load keys back into memory:
+│        └─ wrapperlicenseManagerKeys = 
+│              jsonObjectMapper->readFromString<LicenseManagerKeys>(vaultData)
 │
-└─ 5. Generate Fingerprints
-   ├─ TLFingerPrintService(keys)
-   │  └─ Combines:
-   │     - Hardware IDs (CPU, MB, MAC, Disk)
-   │     - Public keys (Local + SRK)
+└─ 5. Generate Hardware Fingerprints
+   ├─ Get fingerprint keys:
+   │  └─ keys = GetFingerPrintKeys()
+   │     └─ Returns JSON:
+   │        {
+   │          "LocalPublicKey": "...",
+   │          "SRK": "..."  (if wrapperlicenseManagerKeys->SRK != nullptr)
+   │        }
    │
-   ├─ GetFingerPrint(Fallback)
-   │  └─ SHA256(HardwareIDs + LocalPublicKey)
+   ├─ Create fingerprint service:
+   │  └─ spFingerPrintService = std::make_unique<TLFingerPrintService>(keys)
+   │     └─ Collects hardware identifiers:
+   │        - CPU ID (via cpuid instruction)
+   │        - Motherboard serial
+   │        - MAC addresses
+   │        - Disk serial numbers
    │
-   └─ GetFingerPrint(TPM) [if TPM connected]
-      └─ SHA256(HardwareIDs + SRK_PublicKey)
+   ├─ Generate Fallback fingerprint (always):
+   │  └─ ApplicationState::StoreFingerPrint(
+   │       FingerPrintType::Fallback,
+   │       spFingerPrintService->GetFingerPrint(Fallback)
+   │     )
+   │     └─ Combines: SHA256(HardwareIDs + LocalPublicKey)
+   │        Purpose: Software-based hardware binding (no TPM required)
+   │
+   └─ Generate TPM fingerprint (if TPM connected):
+      └─ IF ApplicationState::TPMConnected():
+         └─ ApplicationState::StoreFingerPrint(
+              FingerPrintType::TPM,
+              spFingerPrintService->GetFingerPrint(TPM)
+            )
+            └─ Combines: SHA256(HardwareIDs + SRK_PublicKey)
+               Purpose: Hardware-backed binding (TPM required)
 ```
 
 **Key Characteristics:**
 
-| Key Type | Storage | Private Key Location | Reproducible | Use Case |
-|----------|---------|---------------------|--------------|----------|
-| **Local RSA** | vault.bin | File (encrypted) | ❌ No | Software operations |
-| **SRK** | TPM NV 0x81000835 | Inside TPM chip | ✅ Yes (with seed) | Encryption/Decryption |
-| **Signature Key** | TPM NV 0x81000836 | Inside TPM chip | ✅ Yes (with seed) | Digital signatures |
+| Key Type | Storage Location | Private Key Location | Reproducible | Use Case | Handle |
+|----------|-----------------|---------------------|--------------|----------|--------|
+| **Local RSA** | vault.bin (AES encrypted) | File on disk | ❌ No (random generation) | Software crypto operations | N/A |
+| **SRK** | TPM NV 0x810003E8 | Inside TPM chip | ✅ Yes (deterministic from seed) | Encryption/Decryption | Persistent slot 1000 |
+
+**Deterministic Key Generation:**
+The TPM SRK is generated deterministically using `TPM2_CreatePrimary` with a seed value:
+- Same `auth` + `seed` → **Same key pair** every time
+- Enables key recovery without storing private key
+- Private key never exposed outside TPM
+- Public key exported as PEM for fingerprinting
 
 ---
 
 ### Phase 6: Service Startup
-**File:** `TLLicenseService/sources/include/MainApp.h::main()`
+**File:** [TLLicenseService/sources/include/MainApp.h](TLLicenseService/sources/include/MainApp.h#L91)
 
 ```
-LicenseManagerApp::main()
-├─ 1. Start License Service
-│  └─ spLicenseService->Start(spPersistence)
-│     └─ (See Phase 5 above)
+LicenseManagerApp::main(const std::vector<std::string>& args)
+├─ Create configuration
+│  ├─ spConfiguration = std::make_unique<TLConfiguration>()
+│  └─ pConfig = spConfiguration->GetDefaultConfigurationFile(LICENSE_SERVER_NAME)
+│
+├─ Apply CLI overrides to configuration
+│  ├─ [debug] "Applying CLI overrides to configuration..."
+│  │
+│  ├─ IF cmdl("rest-port"):
+│  │  ├─ Extract port: cmdl("rest-port") >> restPort
+│  │  ├─ pConfig->SetValue("TrustedLicensing.REST.ServerPort", restPort)
+│  │  └─ [info] "Config updated: REST.ServerPort = {port}"
+│  │
+│  ├─ IF cmdl("grpc-port"):
+│  │  ├─ Extract port: cmdl("grpc-port") >> grpcPort
+│  │  ├─ pConfig->SetValue("TrustedLicensing.gRPC.ServerPort", grpcPort)
+│  │  └─ [info] "Config updated: gRPC.ServerPort = {port}"
+│  │
+│  └─ IF cmdl("log-level"):
+│     ├─ Extract level: cmdl("log-level") >> logLevel
+│     ├─ pConfig->SetValue("TrustedLicensing.LicenseManager.LogLevel", logLevel)
+│     └─ [info] "Config updated: LogLevel = {level}"
+│
+├─ Create service instances
+│  ├─ spPersistence = std::make_shared<PersistenceService>()
+│  └─ spLicenseService = std::make_shared<LicenseService>()
+│
+├─ 1. Initialize Persistence Layer
+│  ├─ IF !spPersistence->Initialize():
+│  │  └─ return Application::EXIT_CANTCREAT
+│  │     (Fatal error - cannot create required directories/files)
+│  │
+│  └─ (See Phase 3 for full initialization details)
 │
 ├─ 1a. Log TPM Status After Initialization
-│  ├─ #if TPM_ON
+│  ├─ #if TPM_ON (compile-time check)
 │  │  ├─ IF ApplicationState::TPMConnected():
-│  │  │  └─ Log: "TPM enabled and will be used"
+│  │  │  └─ [info] "TPM enabled and will be used"
 │  │  │
 │  │  └─ ELSE:
-│  │     └─ Log: "TPM compiled in but disabled (--no-tpm or not available)"
+│  │     └─ [info] "TPM compiled in but disabled (--no-tpm or not available)"
 │  │
-│  └─ #else
-│     └─ Log: "TPM not compiled in"
+│  └─ #else (TPM_ON not defined)
+│     └─ [warning] "TPM not compiled in"
 │
-├─ 2. Start gRPC Service [if GRPC_Service enabled]
-│  └─ std::jthread grpcServer([&grpcService] {
-│     └─ GRPCService::Run()
-│        ├─ Load config (port: 50051)
-│        ├─ ServerBuilder.AddListeningPort()
-│        ├─ Register async service
-│        └─ HandleRpcs() event loop
+├─ 2. Start License Service
+│  └─ spLicenseService->Start(spPersistence)
+│     └─ (See Phase 5 for full key generation and loading)
+│
+├─ 3. Start gRPC Service [if GRPC_Service enabled]
+│  ├─ #if GRPC_Service
+│  │  ├─ configServerPort = pConfig->GetValue("TrustedLicensing.gRPC.ServerPort")
+│  │  │  └─ Default: "52013"
+│  │  │
+│  │  ├─ grpcService = std::make_unique<GRPCService>()
+│  │  │
+│  │  └─ std::jthread grpcServer([&grpcService, &grpcServiceFinishedSuccess] {
+│  │     ├─ [debug] "start gRPC"
+│  │     │
+│  │     ├─ std::jthread startServer([&grpcService, &success] {
+│  │     │  ├─ success = grpcService->Run()
+│  │     │  │  └─ GRPCService::Run():
+│  │     │  │     ├─ grpc::ServerBuilder builder
+│  │     │  │     ├─ builder.AddListeningPort("{port}", credentials)
+│  │     │  │     ├─ builder.RegisterService(&service_)
+│  │     │  │     ├─ server = builder.BuildAndStart()
+│  │     │  │     └─ HandleRpcs() - Async RPC event loop
+│  │     │  │        Blocks until ShutDown() called
+│  │     │  │
+│  │     │  └─ [debug] "gRPC Run finished => success: {success}"
+│  │     │  })
+│  │     │
+│  │     └─ (Thread runs until shutdown requested)
+│  │     })
+│  │
+│  └─ #endif
+│
+├─ 4. Start REST API Service (Always enabled)
+│  ├─ restService = std::make_unique<RESTService>(spLicenseService)
+│  │  └─ Passes LicenseService reference for controllers
+│  │
+│  └─ std::jthread restServer([&restService](std::stop_token serverToken) {
+│     ├─ [debug] "start REST"
+│     │
+│     ├─ restReq = restService->Start(serverToken)
+│     │  └─ RESTService::Start():
+│     │     ├─ oatpp::base::Environment::init()
+│     │     │  └─ Initialize oatpp framework
+│     │     │
+│     │     ├─ Create RESTComponent
+│     │     │  └─ Configure router, object mapper, connection provider
+│     │     │
+│     │     ├─ Create StatusController(spLicenseService)
+│     │     │  └─ Endpoints:
+│     │     │     - GET /status - Application status JSON
+│     │     │     - GET /fingerprint - Hardware fingerprints
+│     │     │     - POST /license - License operations
+│     │     │     - GET /health - Health check
+│     │     │
+│     │     ├─ Create connection provider
+│     │     │  └─ oatpp::network::tcp::server::ConnectionProvider
+│     │     │     (Default port: 52014)
+│     │     │
+│     │     └─ oatpp::network::Server::run()
+│     │        └─ Blocks until stop requested
+│     │           Listens for HTTP requests on configured port
+│     │
+│     ├─ IF !restReq.Success:
+│     │  ├─ [error] "{restReq.ErrorMessage}"
+│     │  │
+│     │  └─ #if Windows
+│     │     └─ [info] "restart hns service"
+│     │        (Windows-specific network service hint)
+│     │
+│     └─ ELSE:
+│        └─ [debug] "REST finished"
 │     })
 │
-├─ 3. Start REST API Service (Always)
-│  └─ std::jthread restServer([&restService] {
-│     └─ RESTService::Start(stopToken)
-│        ├─ oatpp::base::Environment::init()
-│        ├─ Create RESTComponent
-│        ├─ Create StatusController
-│        │  └─ Add LicenseService reference
-│        ├─ Add routes to router
-│        ├─ Create connection provider (TCP)
-│        └─ oatpp::network::Server.run()
-│     })
-│
-├─ 4. Wait for Termination Signal
+├─ 5. Wait for Termination Signal
+│  ├─ [debug] "Wait ForTermination Request"
+│  │
 │  └─ waitForTerminationRequest()
-│     └─ POCO handles SIGTERM/SIGINT
+│     └─ POCO ServerApplication method
+│        Blocks until:
+│        - SIGTERM received (systemd stop)
+│        - SIGINT received (Ctrl+C)
+│        - Windows service stop signal
+│        - POCO Application::terminate() called
 │
-└─ 5. Graceful Shutdown
-   ├─ IF GRPC enabled:
-   │  └─ grpcService->ShutDown()
+├─ Termination received
+│  └─ [debug] "Termination Request Received"
+│
+└─ 6. Graceful Shutdown
+   ├─ #if GRPC_Service
+   │  └─ IF grpcServiceFinishedSuccess:
+   │     └─ grpcService->ShutDown()
+   │        └─ server->Shutdown()
+   │           └─ Stops accepting new RPCs
+   │              Waits for in-flight RPCs to complete
    │
-   ├─ restServer.request_stop()
+   ├─ Stop REST server
+   │  └─ restServer.request_stop()
+   │     └─ Signals stop_token → breaks server loop
+   │        oatpp server stops accepting connections
    │
-   └─ Cleanup TPM handles
-      └─ tpm.FlushContext() for transient objects
+   ├─ Thread cleanup (automatic)
+   │  └─ std::jthread destructors wait for threads to finish
+   │
+   ├─ [debug] "Application exit"
+   │
+   └─ return Application::EXIT_OK
+      (Triggers LicenseService destructor)
+      (Triggers TLTPM_Service destructor if exists)
+         └─ Flushes transient TPM handles
+            Closes TPM device connection
 ```
+
+**Service Architecture:**
+
+| Service | Protocol | Default Port | Required | Purpose |
+|---------|----------|--------------|----------|----------|
+| **REST API** | HTTP | 52014 | ✅ Yes | Primary interface for license operations, status, fingerprints |
+| **gRPC** | gRPC/HTTP2 | 52013 | ❌ Optional | High-performance RPC interface (compile-time flag) |
+
+**Shutdown Behavior:**
+- Graceful: Waits for in-flight requests to complete
+- Signal-based: Responds to SIGTERM, SIGINT
+- Thread-safe: Uses std::jthread with stop_token
+- Resource cleanup: TPM handles flushed, connections closed
+- No data loss: Vault and persistence files already written during startup
 
 ---
 
@@ -1176,13 +1740,30 @@ TL2/
 
 ---
 
-**Document Version:** 1.2  
+**Document Version:** 1.3  
 **Last Updated:** January 31, 2026  
 **Maintainer:** TrustedLicensing Team
 
 ---
 
 ## Recent Changes
+
+### v1.3 - January 31, 2026
+- ✅ **Complete regeneration based on current codebase**
+- ✅ Comprehensive code review and validation against actual implementation
+- ✅ Added detailed Phase 1-6 startup flows with line-by-line code paths
+- ✅ Documented actual TPM persistent handle values (0x810003E8 for SRK at slot 1000)
+- ✅ Clarified deterministic key generation mechanics (seed-based reproducibility)
+- ✅ Added container volume tracking via Docker socket API
+- ✅ Documented multi-factor daemon detection on Linux
+- ✅ Enhanced persistence layer with steganographic container details
+- ✅ Added detailed TPM device selection priority and resource manager behavior
+- ✅ Included full LicenseService constructor and key generation flow
+- ✅ Documented conditional TPM service instantiation based on --no-tpm flag
+- ✅ Added comprehensive error handling and validation steps
+- ✅ Included actual code snippets from implementation
+- ✅ Fixed all file path references to use workspace-relative markdown links
+- ✅ Clarified that SRK uses slot 1000 (not 2101 from test code)
 
 ### v1.2 - January 31, 2026
 - ✅ Documentation review and validation against current codebase
@@ -1192,31 +1773,69 @@ TL2/
 
 ### v1.1 - January 28, 2026
 
-### Enhanced CLI Interface
+#### Enhanced CLI Interface
 - ✨ Added `--help` with detailed usage, examples, and config paths
 - ✨ Added `--version` with platform and feature detection
 - ✅ Comprehensive argument validation with helpful error messages
 - ✅ TPM simulator options: `--tpm-host` and `--tpm-port`
 
-### TPM Management
+#### TPM Management
 - ✨ **New `--no-tpm` flag**: Runtime TPM disabling without recompilation
 - ✅ Conditional TPM service instantiation (prevents access when disabled)
 - ✅ Enhanced TPM status logging after initialization
 - ✅ Better error handling for TPM unavailability in containers
 
-### Configuration
+#### Configuration
 - ✅ CLI arguments now directly update runtime configuration
 - ✅ Port overrides (`--rest-port`, `--grpc-port`) applied before service start
 - ✅ Log level changes applied to config object
 
-### Linux Improvements
+#### Linux Improvements
 - ✨ **Daemon auto-detection**: Automatically detects systemd/init execution
 - ✅ Multi-factor daemon detection: terminal, parent process, session leader
 - ✅ Distinguishes between configured daemon vs. detected daemon
 
-### Logging
+#### Logging
 - ✅ Detailed CLI parameter logging on startup
 - ✅ Each override logged individually with context
 - ✅ "Using default" messages when no override provided
 
 ---
+
+<!-- 
+REGENERATION PROMPT:
+Create a markdown in _docs about TLLicenseManager startup sequence and details about TPM usage. 
+Call it TLLicenseManager_StartUp.md
+
+SCOPE:
+- Complete startup sequence from main() through service initialization
+- Persistence layer initialization and secret storage architecture
+- TPM connection and key generation (SRK, signature keys)
+- TPM operations: persistent storage, cryptographic ops, NVRAM, hardware RNG
+- Platform-specific details (Windows/Linux/Container)
+- Security architecture and threat model
+- Troubleshooting common issues
+- Performance characteristics
+- Future enhancements
+
+KEY FILES TO REVIEW:
+- TLLicenseService/sources/src/Main.cpp (entry point)
+- TLLicenseService/sources/include/MainApp.h (POCO app lifecycle)
+- TLLicenseService/sources/src/PersistenceService.cpp (secret storage)
+- TLLicenseService/sources/src/LicenseService.cpp (key generation)
+- TLCrypt/sources/src/TPMService.cpp (TPM operations)
+- TLCrypt/sources/include/TPMService.h (TPM interface)
+- TLTpm/src/TpmDevice.cpp (platform-specific device access)
+- TLTpm/src/include/Tpm2.h (TPM 2.0 commands)
+- _docs/TPM_Docker_Kubernetes_Access.md (container deployment)
+
+UPDATE TRIGGERS:
+- Changes to startup sequence or initialization flow
+- New TPM operations added
+- Persistence format changes
+- Security model updates
+- Platform support additions
+- Configuration changes
+
+LAST UPDATED: January 31, 2026
+-->
