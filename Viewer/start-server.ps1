@@ -12,7 +12,7 @@ $documentRoot = Split-Path $PSScriptRoot -Parent
 Write-Host "Scanning for document updates..." -ForegroundColor Cyan
 $copyScript = Join-Path $documentRoot "copy-documents.ps1"
 if (Test-Path $copyScript) {
-    & $copyScript -Scan
+    & $copyScript -Scan -Copy 
     Write-Host ""
 } else {
     Write-Host "Warning: copy-documents.ps1 not found" -ForegroundColor Yellow

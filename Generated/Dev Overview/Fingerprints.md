@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Created:** 1 February 2026  
 
-**Document Purpose:** This document analyzes the fingerprint data creation flows, hardware identification mechanisms, registration processes, and security implications of fingerprint-based client identification in the TrustedLicensing system.
+**Document Purpose:** This document provides comprehensive technical analysis of fingerprint data creation flows, hardware identification mechanisms, registration processes, and security implications of fingerprint-based client identification in the TrustedLicensing system.
 
 ---
 
@@ -25,24 +25,37 @@
 
 ## 1. Overview
 
-Fingerprints in TrustedLicensing serve as unique hardware identifiers that bind licenses to specific client platforms. The fingerprint architecture provides two modes of operation: **TPM-based fingerprints** for hardware-backed security and **fallback fingerprints** for platforms without TPM support.
+Fingerprints in TrustedLicensing serve as unique hardware identifiers that bind licenses to specific client platforms. The fingerprint architecture provides multiple modes of operation to support diverse deployment scenarios while maintaining strong security guarantees.
 
 ### 1.1 Purpose
 
 **Primary Functions:**
-- **Client Identification:** Uniquely identify TLLicenseManager instances
-- **License Binding:** Cryptographically bind licenses to specific hardware
-- **Package Encryption:** Encrypt license packages for destination-specific delivery
-- **Registration:** Register clients with License Management System (LMS)
-- **Anti-Portability:** Prevent unauthorized license transfer between systems
+
+- **Client Identification:** Uniquely identify TLLicenseManager instances across the licensing infrastructure
+- **License Binding:** Cryptographically bind licenses to specific hardware configurations preventing unauthorized transfers
+- **Package Encryption:** Encrypt license packages for destination-specific delivery ensuring only target clients can decrypt
+- **Registration:** Register clients with License Management System (LMS) establishing trust relationships
+- **Anti-Portability:** Prevent unauthorized license transfer between systems through hardware-bound verification
 
 ### 1.2 Fingerprint Modes
 
-| Mode | Security Level | Hardware Required | Use Case |
-|------|---------------|-------------------|----------|
-| **TPM-Based** | High | TPM 2.0 | Production deployments |
-| **Fallback (Software)** | Medium | None | Development, testing, non-TPM platforms |
-| **Custom** | Vendor-defined | Varies | Specialized embedded systems, IoT devices |
+TrustedLicensing implements three distinct fingerprinting modes to accommodate different security requirements and hardware capabilities:
+
+| Mode | Security Level | Hardware Required | Activation Required | Use Case |
+|------|---------------|-------------------|---------------------|----------|
+| **TPM-Based** | High | TPM 2.0 | None | Production deployments with hardware security |
+| **Fallback (Software)** | Medium | None | Dedicated license feature | Development, testing, non-TPM platforms |
+| **Custom** | Vendor-defined | Varies | Vendor implementation | Specialized embedded systems, IoT devices |
+
+**Mode Selection Logic:**
+
+1. **Primary:** TPM-based fingerprint if TPM 2.0 available and `--no-tpm` flag not set
+2. **Fallback:** Software-based fingerprint if TPM unavailable or disabled
+3. **Custom:** Vendor-defined callback if registered and enabled
+
+**Important Licensing Requirement:**
+
+> A dedicated license feature is required to enable fingerprint-based (non-TPM) licensing. This same license feature can also disable TPM usage if needed for specific deployment scenarios.
 
 **Source:** [Client Architecture.md](../../TLCloud/Client/Client%20Architecture.md "TLCloud/Client"), [TLLicenseManager_StartUp.md](../../TL2/_docs_dev/TLLicenseManager_StartUp.md "TL2/_docs_dev")
 

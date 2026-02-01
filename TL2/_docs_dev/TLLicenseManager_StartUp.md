@@ -258,91 +258,137 @@ LicenseManagerApp::initialize(Application& self)
 
 ---
 
+### Phase 2.5: Environment Detection (Pre-Persistence)
+**File:** [TLLicenseService/sources/include/MainApp.h](TLLicenseService/sources/include/MainApp.h#L122)
+
+This phase occurs in `LicenseManagerApp::main()` **before** persistence initialization.
+
+```
+LicenseManagerApp::main()
+├─ Create service instances
+│  ├─ spPersistence = std::make_shared<PersistenceService>()
+│  └─ spLicenseService = std::make_shared<TLLicensing::LicenseSerivce>()
+│
+├─ ApplicationState::CheckContainer()
+│  └─ Detect containerization (Linux only):
+│     Methods:
+│     ├─ Method 1: Check /.dockerenv file exists → "Docker"
+│     ├─ Method 2: Check /run/.containerenv exists → "Podman"
+│     └─ Method 3: Parse /proc/1/cgroup for patterns:
+│        - "docker" → "Docker"
+│        - "kubepods" → "Kubernetes"
+│        - "containerd" → "Containerd"
+│        - "lxc" → "LXC"
+│     │
+│     └─ IF container detected AND Docker socket available:
+│        ├─ Connect to /var/run/docker.sock
+│        ├─ Read hostname from /etc/hostname → Container ID
+│        ├─ GET /containers/{id}/json
+│        └─ Extract and store in ApplicationState:
+│           - ContainerID (short hash)
+│           - ContainerName (e.g., "/tl-service")
+│           - ContainerImage (e.g., "trustedlicensing:latest")
+│           - ContainerStatus (e.g., "running")
+│           - VolumeMountCount
+│           - VolumeMount0_Name, _Type, _Source, _Destination, _ReadWrite
+│           - VolumeMount1_... (for each mount)
+│     │
+│     Logs:
+│     - [debug] "Containerized => true/false"
+│     - [debug] "ContainerEnvironment => {type}"
+│     - [debug] "Container ID: {id}"
+│     - [debug] "Volume Mount 0: /app/data <- host_path [bind]"
+│
+├─ [trace] "Virtual Machine Status Check"
+│  └─ ApplicationState::CheckVirtualMachine()
+│     └─ TLHardwareService::GetVMState()
+│        Detects virtualization via:
+│        - Windows: WMI queries (Win32_ComputerSystem)
+│        - Linux: /sys/class/dmi/id/* files, cpuid checks
+│        Possible values: VMware, Hyper-V, KVM, Xen, VirtualBox, None
+│        Stored in ApplicationState status
+│
+└─ ApplicationState::CheckTPM()
+   ├─ IF tpmDisabledByCLI (--no-tpm flag was used):
+   │  └─ Skip TPM check entirely
+   │     Status: "TPM Connected" = "false (disabled by CLI)"
+   │     No error logged (intentional)
+   │
+   ├─ ELSE IF TPM_ON (compiled with TPM support):
+   │  ├─ Status: "TPM available" = "in binary"
+   │  ├─ Create TLTPM_Service instance to test connection
+   │  ├─ IF TPM connection succeeds:
+   │  │  └─ Status: "TPM Connected" = "true"
+   │  │     tpmConnected = true
+   │  │
+   │  └─ IF TPM connection fails:
+   │     ├─ tpmConnected = false
+   │     ├─ Status: "TPM Connected" = "false"
+   │     └─ No error logged (will be handled by PersistenceService)
+   │
+   └─ ELSE (!TPM_ON - compiled without TPM):
+      ├─ Status: "TPM available" = "binary unavailable"
+      ├─ Status: "TPM Connected" = "false (not compiled in)"
+      └─ No logging at this stage
+```
+
+**After Environment Detection:**
+```
+└─ spPersistence->Initialize()
+   IF fails:
+   └─ return Application::EXIT_CANTCREAT
+
+├─ Log TPM final status
+│  IF TPM_ON:
+│  ├─ IF TPMConnected():
+│  │  └─ [info] "TPM enabled and will be used"
+│  └─ ELSE:
+│     └─ [info] "TPM compiled in but disabled (--no-tpm or not available)"
+│  ELSE:
+│  └─ [warning] "TPM not compiled in"
+│
+└─ spLicenseService->Start(spPersistence)
+```
+
+---
+
 ### Phase 3: Persistence Layer Initialization
-**File:** [TLLicenseService/sources/src/PersistenceService.cpp](TLLicenseService/sources/src/PersistenceService.cpp#L63)
+
+> **Important**: Environment detection (Container, VM, TPM checks) now occurs in MainApp **BEFORE** PersistenceService::Initialize().
+> See Phase 2 Application Initialization for those checks. The flow is:
+> 1. MainApp calls ApplicationState::CheckContainer()
+> 2. MainApp calls ApplicationState::CheckVirtualMachine()  
+> 3. MainApp calls ApplicationState::CheckTPM()
+> 4. MainApp calls spPersistence->Initialize()
+
+**File:** [TLLicenseService/sources/src/PersistenceService.cpp](TLLicenseService/sources/src/PersistenceService.cpp#L58)
 
 ```
 PersistenceService::Initialize()
+├─ [trace] "PersistenceService::Initialize"
+│
 ├─ 1. Create persistence directory
 │  └─ spConfiguration->CreateDefaultDirectory(TLDirectory::Persistence)
 │     Platform-specific paths:
 │     - Windows: C:\ProgramData\TrustedLicensing\Persistence\
 │     - Linux: /var/lib/TrustedLicensing/Persistence/
 │
-├─ 2. Environment Detection
-│  ├─ ApplicationState::CheckContainer()
-│  │  └─ Detect containerization (Linux only):
-│  │     Methods:
-│  │     ├─ Method 1: Check /.dockerenv file exists → "Docker"
-│  │     ├─ Method 2: Check /run/.containerenv exists → "Podman"
-│  │     └─ Method 3: Parse /proc/1/cgroup for patterns:
-│  │        - "docker" → "Docker"
-│  │        - "kubepods" → "Kubernetes"
-│  │        - "containerd" → "Containerd"
-│  │        - "lxc" → "LXC"
-│  │     │
-│  │     └─ IF container detected AND Docker socket available:
-│  │        ├─ Connect to /var/run/docker.sock
-│  │        ├─ Read hostname from /etc/hostname → Container ID
-│  │        ├─ GET /containers/{id}/json
-│  │        └─ Extract and store:
-│  │           - ContainerID (short hash)
-│  │           - ContainerName (e.g., "/tl-service")
-│  │           - ContainerImage (e.g., "trustedlicensing:latest")
-│  │           - ContainerStatus (e.g., "running")
-│  │           - VolumeMountCount
-│  │           - VolumeMount0_Name, _Type, _Source, _Destination, _ReadWrite
-│  │           - VolumeMount1_... (for each mount)
-│  │     │
-│  │     Logs:
-│  │     - [debug] "Containerized => true/false"
-│  │     - [debug] "ContainerEnvironment => {type}"
-│  │     - [debug] "Container ID: {id}"
-│  │     - [debug] "Volume Mount 0: /app/data <- host_path [bind]"
+├─ 2. TPM Availability Check (Logging Only - Already Determined in MainApp)
+│  ├─ IF TPM_ON (compiled with TPM support):
+│  │  └─ IF !ApplicationState::RunningInContainer() AND !ApplicationState::TPMConnected():
+│  │     └─ [warning] "PersistenceService - TPM not available (may be disabled or missing)"
+│  │        Note: This is informational - TPM detection already completed in MainApp
 │  │
-│  ├─ ApplicationState::CheckVirtualMachine()
-│  │  └─ TLHardwareService::GetVMState()
-│  │     Detects virtualization via:
-│  │     - Windows: WMI queries
-│  │     - Linux: /sys/class/dmi/id/* files, cpuid checks
-│  │     Possible values: VMware, Hyper-V, KVM, Xen, VirtualBox, None
-│  │     Logs: [trace] "Virtual Machine Status Check"
-│  │
-│  └─ ApplicationState::CheckTPM()
-│     ├─ IF tpmDisabledByCLI (--no-tpm flag was used):
-│     │  └─ Skip TPM check entirely
-│     │     Status: "TPM Connected" = "false (disabled by CLI)"
-│     │     No error logged (intentional)
-│     │
-│     ├─ ELSE IF TPM_ON (compiled with TPM support):
-│     │  ├─ Status: "TPM available" = "in binary"
-│     │  ├─ Create TLTPM_Service instance to test connection
-│     │  ├─ IF TPM connection succeeds:
-│     │  │  └─ Status: "TPM Connected" = "true"
-│     │  │     tpmConnected = true
-│     │  │
-│     │  └─ IF TPM connection fails:
-│     │     ├─ tpmConnected = false
-│     │     ├─ Status: "TPM Connected" = "false"
-│     │     │
-│     │     └─ IF running in container:
-│     │        └─ [warning] "PersistenceService - TPM not available (may be disabled or missing)"
-│     │           (Expected in containers without TPM passthrough)
-│     │     
-│     │     └─ ELSE (physical/VM without container):
-│     │        └─ [warning] "PersistenceService - TPM not available (may be disabled or missing)"
-│     │           (Unexpected, but not fatal - allows software-only operation)
-│     │
-│     └─ ELSE (!TPM_ON - compiled without TPM):
-│        ├─ Status: "TPM available" = "binary unavailable"
-│        ├─ Status: "TPM Connected" = "false (not compiled in)"
-│        └─ [info] "PersistenceService - TPM not compiled in binary"
+│  └─ ELSE (!TPM_ON - compiled without TPM):
+│     └─ [info] "PersistenceService - TPM not compiled in binary"
 │
 ├─ 3. Persistence File Management
 │  ├─ Check if persistence.bin exists
 │  │  └─ PersistenceFileName = "{PersistenceDir}/persistence.bin"
 │  │
-│  ├─ IF NOT EXISTS (First-time initialization):
+│  ├─ tmpVaultFileName = PERSISTENCE_VAULT_FILE ("vault.bin")
+│  │
+│  ├─ IF NOT EXISTS (First-time initialization - Cold Start):
 │  │  ├─ PersistenceFileWritten = true
 │  │  │
 │  │  ├─ CreateRandomString(15KB-75KB)
@@ -350,34 +396,84 @@ PersistenceService::Initialize()
 │  │  │     Generate random bytes (0-255) into std::vector<char>
 │  │  │     Purpose: Steganographic container for secret hiding
 │  │  │     Size randomized to prevent fingerprinting
+│  │  │     Log: [trace] "PersistenceService core size init: {size} kByte"
 │  │  │
 │  │  ├─ Generate and embed secrets at fixed positions:
 │  │  │  ├─ Position 100 (variable length): Vault ID + filename
-│  │  │  │  └─ vaultID = AESCrypt::GenerateIV() (32 hex chars)
-│  │  │  │     Value: "{vaultID}.vault.bin" (e.g., "a3b2...f9.vault.bin")
+│  │  │  │  ├─ vaultID = AESCrypt::GenerateIV() (32 hex chars)
+│  │  │  │  └─ persistenceValutValue = "{vaultID}.vault.bin"
+│  │  │  │     Example: "a3b2c4d5...f9.vault.bin"
+│  │  │  │     WriteValue(PERSISTENCE_WAS_INITIALIZED_POS, persistenceValutValue)
 │  │  │  │
-│  │  │  ├─ Position 200 (32 chars): AES Vault Key
-│  │  │  │  └─ aesKeyGen = AESCrypt::GenerateIV()
+│  │  │  ├─ Position 200 (64 hex chars): AES Vault Key
+│  │  │  │  ├─ aesKeyGen = AESCrypt::GenerateIV()
+│  │  │  │  └─ WriteValue(AES_KEY_PERSISTENCE_VAULT_POS, aesKeyGen)
 │  │  │  │
-│  │  │  ├─ Position 250 (32 chars): AES Vault IV
-│  │  │  │  └─ aesIVCGen = AESCrypt::GenerateIV()
-│  │  │  │
-│  │  │  ├─ Position 400 (16 bytes): TPM_AUTH
-│  │  │  │  └─ IF ApplicationState::TPMConnected():
-│  │  │  │     └─ spTPM->Randomize(16).templateValue
-│  │  │  │        (Hardware RNG from TPM)
-│  │  │  │
-│  │  │  └─ Position 450 (16 bytes): TPM_SEED
-│  │  │     └─ IF ApplicationState::TPMConnected():
-│  │  │        └─ spTPM->Randomize(16).templateValue
-│  │  │           (Hardware RNG from TPM)
+│  │  │  └─ Position 250 (64 hex chars): AES Vault IV
+│  │  │     ├─ aesIVCGen = AESCrypt::GenerateIV()
+│  │  │     └─ WriteValue(AES_IVC_PERSISTENCE_VAULT_POS, aesIVCGen)
 │  │  │
-│  │  ├─ Encrypt entire container with AES-256
-│  │  │  └─ spAEShc->AESEncrypt(PersistenceCoreData)
-│  │  │     Key: AES_KEY_PERSISTENCE_LOCAL (hardcoded)
-│  │  │     IV:  AES_IVC_PERSISTENCE_LOCAL (hardcoded)
-│  │  │
-│  │  └─ WritePersistenceCoreFile()
+│  │  └─ Note: WritePersistenceCoreFile() called later after validation
+│  │
+│  └─ ELSE (Warm start - File exists):
+│     ├─ PersistenceFileWritten = false
+│     │
+│     └─ ReadPersistenceCoreFile()
+│        ├─ Read ciphertext from persistence.bin
+│        │  Log: [trace] "Read {PersistenceFileName}"
+│        ├─ cipher = TLCommon::Files::ReadFile(PersistenceFileName)
+│        ├─ AES-decrypt: decrypt = spAEShc->AESDecrypt(cipher)
+│        │  Using hardcoded key/IV:
+│        │  - Key: AES_KEY_PERSISTENCE_LOCAL
+│        │  - IV:  AES_IVC_PERSISTENCE_LOCAL
+│        └─ Store plaintext in PersistenceCoreData (in-memory)
+│
+├─ 4. Extract Secrets from Memory
+│  ├─ Calculate vault filename length
+│  │  └─ length = AES_IV_LENGTH * 2 + tmpVaultFileName.length() + 1
+│  │
+│  ├─ VaultFileName = ReadValue(PERSISTENCE_WAS_INITIALIZED_POS, length)
+│  │  └─ Extract: "{hexID}.vault.bin"
+│  │
+│  ├─ AESGenKey = ReadValue(AES_KEY_PERSISTENCE_VAULT_POS, AES_IV_LENGTH * AES_FACTOR)
+│  │  └─ 32 bytes as 64 hex characters (AES_IV_LENGTH=32, AES_FACTOR=2)
+│  │
+│  └─ AESGenIV = ReadValue(AES_IVC_PERSISTENCE_VAULT_POS, AES_IV_LENGTH * AES_FACTOR)
+│     └─ 32 bytes as 64 hex characters
+│
+└─ 5. Validation
+   ├─ Verify AES keys are valid hexadecimal
+   │  └─ TLCommon::Conversion::isHexadecimal(AESGenKey)
+   │     TLCommon::Conversion::isHexadecimal(AESGenIV)
+   │     IF invalid:
+   │     - [error] "PersistenceService - key initializatin failure!"
+   │     - ApplicationState::AddLMStatusError("PersistenceService", "key initializatin failure")
+   │     - retval = false
+   │
+   ├─ Verify vault filename valid
+   │  └─ IF !VaultFileName.find(PERSISTENCE_VAULT_FILE):
+   │     - [error] "PersistenceService - vault initializatin failure!"
+   │     - ApplicationState::AddLMStatusError("PersistenceService", "vault initializatin failure")
+   │     - retval = false
+   │
+   ├─ IF all validations pass (retval == true):
+   │  ├─ [info] "PersistenceService - initialized!"
+   │  ├─ ApplicationState::AddSetLMStatus("PersistenceService", "initialized")
+   │  │
+   │  └─ Create AESCrypt instance for vault operations
+   │     └─ spAESvault = std::make_unique<AESCrypt>(AESGenKey, AESGenIV)
+   │
+   └─ return retval (true if success, false if validation failed)
+```
+
+**Exception Handling:**
+```cpp
+try {
+    // All initialization steps above...
+} catch (const std::exception& e) {
+    BOOST_LOG_TRIVIAL(error) << "PersistenceService::Initialize " << e.what();
+    return false;
+}
 │  │     └─ TLCommon::Files::SaveData(persistence.bin, encrypted)
 │  │
 │  └─ ELSE (Warm start):
@@ -395,14 +491,8 @@ PersistenceService::Initialize()
 │  ├─ AESGenKey = ReadValue(position 200, 64 chars)
 │  │  └─ 32 bytes as 64 hex characters
 │  │
-│  ├─ AESGenIV = ReadValue(position 250, 64 chars)
-│  │  └─ 32 bytes as 64 hex characters
-│  │
-│  ├─ TPMAuth = ReadValue(position 400, 16 bytes)
-│  │  └─ Raw binary (not hex encoded)
-│  │
-│  └─ TPMSeed = ReadValue(position 450, 16 bytes)
-│     └─ Raw binary (not hex encoded)
+│  └─ AESGenIV = ReadValue(position 250, 64 chars)
+│     └─ 32 bytes as 64 hex characters
 │
 └─ 5. Validation
    ├─ Verify AES keys are valid hexadecimal
@@ -411,12 +501,6 @@ PersistenceService::Initialize()
    │     IF invalid:
    │     - [error] "PersistenceService - key initialization failure!"
    │     - AddLMStatusError("PersistenceService", "key initialization failure")
-   │     - retval = false
-   │
-   ├─ Verify TPM auth/seed exist (if TPM expected)
-   │  └─ IF TPMAuth.empty() OR TPMSeed.empty():
-   │     - [error] "PersistenceService - TPM initialization failure!"
-   │     - AddLMStatusError("PersistenceService", "TPM initialization failure")
    │     - retval = false
    │
    ├─ Verify vault filename valid
@@ -439,7 +523,6 @@ PersistenceService::Initialize()
 - **Fixed positions**: Implementation detail (obfuscation, not security)
 - **AES encryption**: Hardcoded key protects persistence.bin at rest
 - **Filesystem permissions**: Requires elevated access to read/write
-- **TPM-derived secrets**: TPM_AUTH and TPM_SEED use hardware RNG (non-predictable)
 - **Vault keys**: AESGenKey/AESGenIV are software-generated but encrypted
 
 **Purpose of Secrets:**
@@ -448,13 +531,11 @@ PersistenceService::Initialize()
 | **VaultFileName** | Identifies vault.bin | Software RNG |
 | **AESGenKey** | Encrypts vault.bin | Software RNG |
 | **AESGenIV** | Vault encryption IV | Software RNG |
-| **TPM_AUTH** | TPM handle authentication | TPM Hardware RNG |
-| **TPM_SEED** | Deterministic key generation | TPM Hardware RNG |
 
 **File Dependencies:**
 ```
 persistence.bin (encrypted)
-    └─ Contains: VaultFileName, AESGenKey, AESGenIV, TPM_AUTH, TPM_SEED
+    └─ Contains: VaultFileName, AESGenKey, AESGenIV
        └─ Used to decrypt ─┐
                             ↓
                       vault.bin (encrypted)
@@ -645,7 +726,7 @@ LicenseService::Start(spPersistence)
 │
 ├─ Get persistence data
 │  └─ persistenceData = spPersistence->GetPersistenceData()
-│     Fields: TPMAuth, TPMSeed, PersistenceFileWritten
+│     Fields: PersistenceFileWritten
 │
 ├─ Create JSON object mapper
 │  └─ jsonObjectMapper = TLCommon::Serialization::CreateObjectMapper()
@@ -721,10 +802,18 @@ LicenseService::Start(spPersistence)
 │     │        │     ├─ [debug] "Initializing TPM service for key generation"
 │     │        │     └─ spTPMService = std::make_unique<TLTPM_Service>()
 │     │        │
+│     │        ├─ Generate temporary TPM auth and seed
+│     │        │  ├─ tpmAuth = spTPMService->Randomize(16).templateValue
+│     │        │  │  └─ Uses TPM hardware RNG for cryptographically secure random bytes
+│     │        │  │
+│     │        │  └─ tpmSeed = spTPMService->Randomize(16).templateValue
+│     │        │     └─ Uses TPM hardware RNG for cryptographically secure random bytes
+│     │        │     Note: Generated fresh each time, not persisted
+│     │        │
 │     │        ├─ Create Storage Root Key (SRK)
 │     │        │  ├─ Call: tpmSRK = spTPMService->InitStorageRootKey(
-│     │        │  │           auth: String2ByteVec(psd.TPMAuth),
-│     │        │  │           seed: String2ByteVec(psd.TPMAuth),  ← Note: Uses auth as seed
+│     │        │  │           auth: tpmAuth,
+│     │        │  │           seed: tpmSeed,
 │     │        │  │           persistence: PERSISTENCE_SRK_EVICT  (value: 1000)
 │     │        │  │        )
 │     │        │  │
@@ -759,7 +848,7 @@ LicenseService::Start(spPersistence)
 │     │        │  │  │       creationPCR: null
 │     │        │  │  │     )
 │     │        │  │  │     └─ Returns: handle, outPublic, ...
-│     │        │  │  │        **Key point**: Same auth + seed = Same key pair!
+│     │        │  │  │        **Note**: Fresh random seed generates unique keys each time
 │     │        │  │  │
 │     │        │  │  ├─ Check for errors:
 │     │        │  │  │  └─ IF !tpm._LastCommandSucceeded():
@@ -872,14 +961,15 @@ LicenseService::Start(spPersistence)
 | Key Type | Storage Location | Private Key Location | Reproducible | Use Case | Handle |
 |----------|-----------------|---------------------|--------------|----------|--------|
 | **Local RSA** | vault.bin (AES encrypted) | File on disk | ❌ No (random generation) | Software crypto operations | N/A |
-| **SRK** | TPM NV 0x810003E8 | Inside TPM chip | ✅ Yes (deterministic from seed) | Encryption/Decryption | Persistent slot 1000 |
+| **SRK** | TPM NV 0x810003E8 | Inside TPM chip | ❌ No (unique per cold start) | Encryption/Decryption | Persistent slot 1000 |
 
-**Deterministic Key Generation:**
-The TPM SRK is generated deterministically using `TPM2_CreatePrimary` with a seed value:
-- Same `auth` + `seed` → **Same key pair** every time
-- Enables key recovery without storing private key
+**TPM Key Generation:**
+The TPM SRK is generated using `TPM2_CreatePrimary` with fresh random values on each cold start:
+- Fresh `auth` + `seed` generated from TPM hardware RNG
+- Creates **unique key pair** for each initialization
 - Private key never exposed outside TPM
 - Public key exported as PEM for fingerprinting
+- Keys stored in persistent TPM storage (survives reboots)
 
 ---
 
@@ -1807,6 +1897,18 @@ REGENERATION PROMPT:
 Create a markdown in _docs about TLLicenseManager startup sequence and details about TPM usage. 
 Call it TLLicenseManager_StartUp.md
 
+⚠️ CRITICAL: ALWAYS verify documentation against actual source code before regenerating.
+Use grep_search, read_file, and semantic_search to validate all flows, constants, and behavior.
+
+REGENERATION STEPS:
+1. Read and analyze the source files listed below
+2. Verify all code flows, constant values, and error messages match implementation
+3. Check for any recent changes to initialization sequences
+4. Validate log messages against actual BOOST_LOG_TRIVIAL calls
+5. Confirm all file paths and line numbers are current
+6. Update "LAST UPDATED" date to current date
+7. Document any behavioral changes discovered during code review
+
 SCOPE:
 - Complete startup sequence from main() through service initialization
 - Persistence layer initialization and secret storage architecture
@@ -1818,24 +1920,40 @@ SCOPE:
 - Performance characteristics
 - Future enhancements
 
-KEY FILES TO REVIEW:
+KEY FILES TO REVIEW (ALWAYS CHECK THESE):
 - TLLicenseService/sources/src/Main.cpp (entry point)
-- TLLicenseService/sources/include/MainApp.h (POCO app lifecycle)
+- TLLicenseService/sources/include/MainApp.h (POCO app lifecycle & main())
 - TLLicenseService/sources/src/PersistenceService.cpp (secret storage)
+- TLLicenseService/sources/include/PersistenceService.h (persistence interface)
 - TLLicenseService/sources/src/LicenseService.cpp (key generation)
+- TLLicenseService/sources/src/ApplicationState.cpp (state management)
 - TLCrypt/sources/src/TPMService.cpp (TPM operations)
 - TLCrypt/sources/include/TPMService.h (TPM interface)
 - TLTpm/src/TpmDevice.cpp (platform-specific device access)
 - TLTpm/src/include/Tpm2.h (TPM 2.0 commands)
-- _docs/TPM_Docker_Kubernetes_Access.md (container deployment)
+- _docs_dev/TPM_Docker_Kubernetes_Access.md (container deployment)
+
+VERIFICATION CHECKLIST:
+□ All #define constants match source code
+□ All log messages match actual BOOST_LOG_TRIVIAL calls
+□ Function call sequences verified with grep_search
+□ Error handling flows match try/catch blocks
+□ CLI arguments match argh parser implementation
+□ ApplicationState method calls occur in correct order
+□ File paths and line numbers are accurate
+□ TPM auth/seed handling matches current implementation
+□ Persistence positions and lengths are correct
+□ All code snippets compile and are accurate
 
 UPDATE TRIGGERS:
 - Changes to startup sequence or initialization flow
 - New TPM operations added
-- Persistence format changes
+- Persistence format changes (positions, encryption, storage)
 - Security model updates
 - Platform support additions
 - Configuration changes
+- CLI argument additions/changes
+- ApplicationState method signature changes
 
-LAST UPDATED: January 31, 2026
+LAST UPDATED: February 1, 2026
 -->

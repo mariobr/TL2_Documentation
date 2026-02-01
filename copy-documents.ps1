@@ -7,9 +7,9 @@ param(
     [switch]$RemoveSources
 )
 
-# Default to scan mode if no option specified
+# Default to Copy mode to always sync newer files
 if (-not $Copy -and -not $Scan -and -not $RemoveSources) {
-    $Scan = $true
+    $Copy = $true
 }
 
 # Define workspace and parent directory
