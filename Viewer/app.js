@@ -20,9 +20,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Load theme preference
     loadThemePreference();
+    console.log('Theme preference loaded');
     
     // Initialize Mermaid
     updateMermaidTheme();
+    console.log('Mermaid initialized');
     
     // Configure marked for markdown rendering
     marked.setOptions({
@@ -35,15 +37,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         breaks: true,
         gfm: true
     });
+    console.log('Marked configured');
     
     // Load documents
     await loadDocuments();
+    console.log('Documents loaded');
     
     // Setup event listeners
     setupEventListeners();
+    console.log('Event listeners setup');
     
     // Initialize UI
     initializeUI();
+    console.log('UI initialized');
 });
 
 // Load documents from JSON and Generated folder
@@ -170,9 +176,18 @@ function setupEventListeners() {
 
 // Initialize UI components
 function initializeUI() {
+    console.log('initializeUI: Starting UI initialization...');
+    console.log(`initializeUI: Total documents: ${Object.keys(state.documents).length}`);
+    console.log(`initializeUI: Filtered docs: ${state.filteredDocs.length}`);
+    
     populateRepositoryFilter();
+    console.log('initializeUI: Repository filter populated');
+    
     renderDocumentTree();
+    console.log('initializeUI: Document tree rendered');
+    
     renderTopics();
+    console.log('initializeUI: Topics rendered');
 }
 
 // Populate repository filter
@@ -241,25 +256,42 @@ function switchTab(tabName) {
 
 // Render document tree with hierarchy
 function renderDocumentTree() {
+    console.log('renderDocumentTree: Starting tree render...');
     const treeContainer = document.getElementById('documentTree');
+    console.log('renderDocumentTree: Tree container found:', !!treeContainer);
+    console.log('renderDocumentTree: Filtered docs count:', state.filteredDocs.length);
+    
     const tree = buildTree(state.filteredDocs);
-    treeContainer.innerHTML = renderTree(tree);
+    console.log('renderDocumentTree: Tree built:', Object.keys(tree).length, 'root items');
+    
+    const treeHTML = renderTree(tree);
+    console.log('renderDocumentTree: Tree HTML length:', treeHTML.length);
+    
+    treeContainer.innerHTML = treeHTML;
     
     // Add click handlers
     treeContainer.querySelectorAll('.tree-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            console.log('Tree item clicked:', item);
             e.stopPropagation();
             
             if (item.classList.contains('folder')) {
+                console.log('Folder clicked, toggling...');
                 toggleFolder(item);
             } else {
+                console.log('File clicked');
                 const path = item.dataset.path;
+                console.log('File path:', path);
                 if (path) {
                     loadDocument(path);
+                } else {
+                    console.warn('No path data found on item');
                 }
             }
         });
     });
+    
+    console.log('renderDocumentTree: Event listeners attached to', treeContainer.querySelectorAll('.tree-item').length, 'items');
 }
 
 // Build hierarchical tree structure
@@ -439,6 +471,8 @@ async function loadDocument(path) {
 // Load markdown document
 async function loadMarkdownDocument(doc) {
     try {
+        console.log('Loading document:', doc);
+        
         // Try to load from workspace path
         const possiblePaths = [
             `../${doc.workspaceRelativePath}`,
@@ -446,17 +480,35 @@ async function loadMarkdownDocument(doc) {
             doc.relativePath
         ];
         
+        console.log('Trying paths:', possiblePaths);
+        
         let content = null;
         let error = null;
         
         for (const path of possiblePaths) {
             try {
-                const response = await fetch(path);
+                // Encode only the path segments (not .. or / separators)
+                const encodedPath = path.split('/').map(part => {
+                    if (part === '..' || part === '.') return part;
+                    return encodeURIComponent(part);
+                }).join('/');
+                console.log(`Fetching: ${path} (encoded: ${encodedPath})`);
+                
+                console.log('About to call fetch...');
+                const response = await fetch(encodedPath);
+                console.log('Fetch completed!');
+                
+                console.log(`Response received! Status: ${response.status} for ${path}`);
                 if (response.ok) {
+                    console.log('Reading response text...');
                     content = await response.text();
+                    console.log(`Successfully loaded from: ${path}, content length: ${content.length}`);
                     break;
+                } else {
+                    console.warn(`Response not OK: ${response.status} ${response.statusText}`);
                 }
             } catch (e) {
+                console.error(`Error fetching ${path}:`, e.name, e.message, e);
                 error = e;
             }
         }
