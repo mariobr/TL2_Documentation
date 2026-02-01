@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrustedLicensing Documentation Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- Mermaid diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <!-- PlantUML rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/plantuml-encoder@1.4.0/dist/plantuml-encoder.min.js"></script>
+    
+    <!-- Syntax highlighting for code blocks -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📚 TrustedLicensing Documentation</h1>
+                <div class="header-controls">
+                    <input type="text" id="searchInput" placeholder="Search documents..." class="search-input">
+                    <button id="themeToggle" class="btn btn-icon" title="Toggle theme">
+                        <span class="theme-icon">🌙</span>
+                    </button>
+                    <button id="refreshBtn" class="btn btn-secondary" title="Refresh document list">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-tabs">
+                    <button class="tab-button active" data-tab="hierarchy">
+                        📁 Hierarchy
+                    </button>
+                    <button class="tab-button" data-tab="topics">
+                        🏷️ Topics
+                    </button>
+                </div>
+
+                <!-- Hierarchy Tab Content -->
+                <div id="hierarchyTab" class="tab-content active">
+                    <div class="filter-controls">
+                        <select id="repositoryFilter" class="filter-select">
+                            <option value="all">All Repositories</option>
+                        </select>
+                        <select id="fileTypeFilter" class="filter-select">
+                            <option value="all">All File Types</option>
+                            <option value=".md">Markdown (.md)</option>
+                            <option value=".pdf">PDF (.pdf)</option>
+                            <option value=".docx">Word (.docx)</option>
+                            <option value=".ppt,.pptx">PowerPoint (.ppt/.pptx)</option>
+                        </select>
+                    </div>
+                    <div id="documentTree" class="document-tree"></div>
+                </div>
+
+                <!-- Topics Tab Content -->
+                <div id="topicsTab" class="tab-content">
+                    <div class="topics-container" id="topicsContainer"></div>
+                </div>
+            </aside>
+
+            <!-- Document Viewer -->
+            <main class="viewer">
+                <div id="viewerToolbar" class="viewer-toolbar">
+                    <div class="viewer-breadcrumb" id="breadcrumb">
+                        <span class="breadcrumb-home">📄 Select a document</span>
+                    </div>
+                    <div class="viewer-actions">
+                        <button id="openExternalBtn" class="btn btn-icon" title="Open in external app" style="display: none;">
+                            🔗 Open External
+                        </button>
+                        <button id="copyPathBtn" class="btn btn-icon" title="Copy file path" style="display: none;">
+                            📋 Copy Path
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="viewerContent" class="viewer-content">
+                    <div class="welcome-screen">
+                        <div class="welcome-icon">📚</div>
+                        <h2>Welcome to TrustedLicensing Documentation Viewer</h2>
+                        <p>Select a document from the sidebar to view its content</p>
+                        <div class="welcome-features">
+                            <div class="feature">
+                                <span class="feature-icon">📝</span>
+                                <span>Markdown Support</span>
+                            </div>
+                            <div class="feature">
+                                <span class="feature-icon">📊</span>
+                                <span>Mermaid Diagrams</span>
+                            </div>
+                            <div class="feature">
+                                <span class="feature-icon">🎨</span>
+                                <span>PlantUML Charts</span>
+                            </div>
+                            <div class="feature">
+                                <span class="feature-icon">📄</span>
+                                <span>PDF Viewer</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading document...</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="toast toast-error" style="display: none;">
+        <span class="toast-icon">⚠️</span>
+        <span class="toast-message" id="errorMessage"></span>
+        <button class="toast-close" onclick="hideToast()">✕</button>
+    </div>
+
+    <!-- Success Toast -->
+    <div id="successToast" class="toast toast-success" style="display: none;">
+        <span class="toast-icon">✓</span>
+        <span class="toast-message" id="successMessage"></span>
+        <button class="toast-close" onclick="hideToast()">✕</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
