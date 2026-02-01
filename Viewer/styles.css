@@ -12,7 +12,7 @@
     --text-primary: #212529;
     --text-secondary: #6c757d;
     --sidebar-width: 350px;
-    --header-height: 70px;
+    --header-height: 80px;
     --toolbar-height: 50px;
     --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --code-font: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -65,12 +65,22 @@ body {
     padding: 0 24px;
 }
 
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.logo-image {
+    height: 64px;
+    width: auto;
+    display: block;
+}
+
 .header h1 {
     font-size: 24px;
     font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    margin: 0;
 }
 
 .header-controls {
