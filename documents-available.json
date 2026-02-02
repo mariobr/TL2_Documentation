@@ -135,6 +135,14 @@
     "size": 240,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\TestTL2.md"
   },
+  "TL2/_docs_dev/SDK_LicenseManager.md": {
+    "repository": "TL2",
+    "lastModified": "2026-02-02 08:49:53",
+    "relativePath": "_docs_dev/SDK_LicenseManager.md",
+    "workspaceRelativePath": "TL2/_docs_dev/SDK_LicenseManager.md",
+    "size": 16897,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs_dev\\SDK_LicenseManager.md"
+  },
   "TLCloud/01_BuildCompileCMake.md": {
     "repository": "TLCloud",
     "lastModified": "2025-12-30 12:24:46",
@@ -193,10 +201,10 @@
   },
   "TL2_dotnet/_docs_dev/TL2CryptInterop.md": {
     "repository": "TL2_dotnet",
-    "lastModified": "2026-02-02 08:05:57",
+    "lastModified": "2026-02-02 09:06:56",
     "relativePath": "_docs_dev/TL2CryptInterop.md",
     "workspaceRelativePath": "TL2_dotnet/_docs_dev/TL2CryptInterop.md",
-    "size": 19045,
+    "size": 19871,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TL2_dotnet\\_docs_dev\\TL2CryptInterop.md"
   },
   "TL2/_docs_dev/TLLicenseManager_StartUp.md": {
@@ -279,13 +287,21 @@
     "size": 1112,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\ToDo\\InfraTodo.md"
   },
-  "TLCloud/Client/KeyRequired.md": {
+  "TLCloud/_dev/update-nuget-directory-packages-props.md": {
     "repository": "TLCloud",
-    "lastModified": "2026-01-31 15:33:48",
-    "relativePath": "Client/KeyRequired.md",
-    "workspaceRelativePath": "TLCloud/Client/KeyRequired.md",
-    "size": 841,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\KeyRequired.md"
+    "lastModified": "2026-01-14 08:45:12",
+    "relativePath": "_dev/update-nuget-directory-packages-props.md",
+    "workspaceRelativePath": "TLCloud/_dev/update-nuget-directory-packages-props.md",
+    "size": 2323,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\update-nuget-directory-packages-props.md"
+  },
+  "TLCloud/LinuxStuff.md": {
+    "repository": "TLCloud",
+    "lastModified": "2025-12-19 18:27:32",
+    "relativePath": "LinuxStuff.md",
+    "workspaceRelativePath": "TLCloud/LinuxStuff.md",
+    "size": 689,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LinuxStuff.md"
   },
   "TL2/_docs_dev/SDKPrompt.md": {
     "repository": "TL2",
@@ -351,13 +367,13 @@
     "size": 4376,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs_dev\\PersistenceFingerprint.md"
   },
-  "TLCloud/_dev/update-nuget-directory-packages-props.md": {
+  "TLCloud/_dev/solution.overview.md": {
     "repository": "TLCloud",
-    "lastModified": "2026-01-14 08:45:12",
-    "relativePath": "_dev/update-nuget-directory-packages-props.md",
-    "workspaceRelativePath": "TLCloud/_dev/update-nuget-directory-packages-props.md",
-    "size": 2323,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\update-nuget-directory-packages-props.md"
+    "lastModified": "2025-12-01 18:21:41",
+    "relativePath": "_dev/solution.overview.md",
+    "workspaceRelativePath": "TLCloud/_dev/solution.overview.md",
+    "size": 2617,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\solution.overview.md"
   },
   "TLCloud/Crypto.md": {
     "repository": "TLCloud",
@@ -391,14 +407,6 @@
     "size": 5223,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\VendorProtectionAPI\\Extensions\\VendorHeader.md"
   },
-  "TLCloud/LinuxStuff.md": {
-    "repository": "TLCloud",
-    "lastModified": "2025-12-19 18:27:32",
-    "relativePath": "LinuxStuff.md",
-    "workspaceRelativePath": "TLCloud/LinuxStuff.md",
-    "size": 689,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LinuxStuff.md"
-  },
   "TLCloud/_dev/solution.dependency.overview.md": {
     "repository": "TLCloud",
     "lastModified": "2025-12-01 18:21:41",
@@ -431,13 +439,13 @@
     "size": 35055,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs_dev\\CLI_Integration.md"
   },
-  "TLCloud/_dev/solution.overview.md": {
+  "TLCloud/Client/KeyRequired.md": {
     "repository": "TLCloud",
-    "lastModified": "2025-12-01 18:21:41",
-    "relativePath": "_dev/solution.overview.md",
-    "workspaceRelativePath": "TLCloud/_dev/solution.overview.md",
-    "size": 2617,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\solution.overview.md"
+    "lastModified": "2026-01-31 15:33:48",
+    "relativePath": "Client/KeyRequired.md",
+    "workspaceRelativePath": "TLCloud/Client/KeyRequired.md",
+    "size": 841,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\KeyRequired.md"
   },
   "TLCloud/LMS/LicenseModels.md": {
     "repository": "TLCloud",

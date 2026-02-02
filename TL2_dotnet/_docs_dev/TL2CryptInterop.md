@@ -227,10 +227,32 @@ C++ Application                    C# Application
 
 ### Compilation Flags
 
-**FASTCRYPT:** When defined, uses 2048-bit RSA keys instead of 4096-bit
+**FASTCRYPT:** Controls RSA key size for performance vs security trade-offs
+
+- **When defined:** Uses 2048-bit RSA keys
+- **When undefined:** Uses 4096-bit RSA keys (default)
+- **Current status:** Enabled in Debug configuration
+- **Performance impact:** 2048-bit keys are significantly faster for key generation and cryptographic operations
+- **Security consideration:** Both key sizes are considered strong, but 4096-bit provides higher security margin
+
+**Configuration in project file:**
 ```xml
-<DefineConstants>$(DefineConstants);FASTCRYPT</DefineConstants>
+<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <DefineConstants>$(DefineConstants);FASTCRYPT</DefineConstants>
+</PropertyGroup>
 ```
+
+**Implementation in code:**
+```csharp
+// RSAInterop.cs
+#if FASTCRYPT
+    const int KEYSIZE = 2048;
+#else
+    const int KEYSIZE = 4096;
+#endif
+```
+
+**Recommendation:** Use FASTCRYPT for development/testing to improve iteration speed. Disable for production builds requiring maximum security.
 
 ### Target Framework
 
