@@ -191,13 +191,13 @@
     "size": 3734,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Config4Instances.md"
   },
-  "TLCloud/Client/KeyRequired.md": {
-    "repository": "TLCloud",
-    "lastModified": "2026-01-31 15:33:48",
-    "relativePath": "Client/KeyRequired.md",
-    "workspaceRelativePath": "TLCloud/Client/KeyRequired.md",
-    "size": 841,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\KeyRequired.md"
+  "TL2_dotnet/_docs_dev/TL2CryptInterop.md": {
+    "repository": "TL2_dotnet",
+    "lastModified": "2026-02-02 08:05:57",
+    "relativePath": "_docs_dev/TL2CryptInterop.md",
+    "workspaceRelativePath": "TL2_dotnet/_docs_dev/TL2CryptInterop.md",
+    "size": 19045,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TL2_dotnet\\_docs_dev\\TL2CryptInterop.md"
   },
   "TL2/_docs_dev/TLLicenseManager_StartUp.md": {
     "repository": "TL2",
@@ -222,6 +222,14 @@
     "workspaceRelativePath": "TLCloud/LMS/Activation/Activation.md",
     "size": 5656,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LMS\\Activation\\Activation.md"
+  },
+  "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf": {
+    "repository": "TLCloud",
+    "lastModified": "2025-12-19 18:27:32",
+    "relativePath": "Conceptual Background/Defending agaings VM Rollback.pdf",
+    "workspaceRelativePath": "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf",
+    "size": 169523,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\Defending agaings VM Rollback.pdf"
   },
   "TLCloud/_uml/LicenseManagerRegistrtion.plantuml": {
     "repository": "TLCloud",
@@ -271,21 +279,21 @@
     "size": 1112,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\ToDo\\InfraTodo.md"
   },
-  "TLCloud/LinuxStuff.md": {
+  "TLCloud/Client/KeyRequired.md": {
     "repository": "TLCloud",
-    "lastModified": "2025-12-19 18:27:32",
-    "relativePath": "LinuxStuff.md",
-    "workspaceRelativePath": "TLCloud/LinuxStuff.md",
-    "size": 689,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LinuxStuff.md"
+    "lastModified": "2026-01-31 15:33:48",
+    "relativePath": "Client/KeyRequired.md",
+    "workspaceRelativePath": "TLCloud/Client/KeyRequired.md",
+    "size": 841,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Client\\KeyRequired.md"
   },
-  "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf": {
-    "repository": "TLCloud",
-    "lastModified": "2025-12-19 18:27:32",
-    "relativePath": "Conceptual Background/Defending agaings VM Rollback.pdf",
-    "workspaceRelativePath": "TLCloud/Conceptual Background/Defending agaings VM Rollback.pdf",
-    "size": 169523,
-    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\Conceptual Background\\Defending agaings VM Rollback.pdf"
+  "TL2/_docs_dev/SDKPrompt.md": {
+    "repository": "TL2",
+    "lastModified": "2026-02-02 08:36:03",
+    "relativePath": "_docs_dev/SDKPrompt.md",
+    "workspaceRelativePath": "TL2/_docs_dev/SDKPrompt.md",
+    "size": 591,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TL2\\_docs_dev\\SDKPrompt.md"
   },
   "TLCloud/LMS/Roles_and_Namespaces.md": {
     "repository": "TLCloud",
@@ -382,6 +390,14 @@
     "workspaceRelativePath": "TLCloud/_dev/VendorProtectionAPI/Extensions/VendorHeader.md",
     "size": 5223,
     "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\_dev\\VendorProtectionAPI\\Extensions\\VendorHeader.md"
+  },
+  "TLCloud/LinuxStuff.md": {
+    "repository": "TLCloud",
+    "lastModified": "2025-12-19 18:27:32",
+    "relativePath": "LinuxStuff.md",
+    "workspaceRelativePath": "TLCloud/LinuxStuff.md",
+    "size": 689,
+    "fullPath": "D:\\DEV\\TL2_Documentation\\TLCloud\\LinuxStuff.md"
   },
   "TLCloud/_dev/solution.dependency.overview.md": {
     "repository": "TLCloud",

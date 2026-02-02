@@ -7,6 +7,9 @@ param(
     [switch]$RemoveSources
 )
 
+# Track if Copy was explicitly passed
+$CopyExplicitlyPassed = $PSBoundParameters.ContainsKey('Copy')
+
 # Default to Copy mode to always sync newer files
 if (-not $Copy -and -not $Scan -and -not $RemoveSources) {
     $Copy = $true
@@ -381,14 +384,18 @@ if ($Scan) {
     
     if ($totalNew -gt 0 -or $totalUpdated -gt 0) {
         Write-Host "`nChanges detected!" -ForegroundColor Yellow
-        $response = Read-Host "`nDo you want to copy the changed files? (Y/N)"
         
-        if ($response -eq 'Y' -or $response -eq 'y') {
-            Write-Host "`nRunning copy operation..." -ForegroundColor Green
-            & $PSCommandPath -Copy
-        }
-        else {
-            Write-Host "`nCopy skipped. Run with -Copy flag to copy files manually." -ForegroundColor Gray
+        # Only prompt if Copy wasn't explicitly passed
+        if (-not $CopyExplicitlyPassed) {
+            $response = Read-Host "`nDo you want to copy the changed files? (Y/N)"
+            
+            if ($response -eq 'Y' -or $response -eq 'y') {
+                Write-Host "`nRunning copy operation..." -ForegroundColor Green
+                & $PSCommandPath -Copy
+            }
+            else {
+                Write-Host "`nCopy skipped. Run with -Copy flag to copy files manually." -ForegroundColor Gray
+            }
         }
     }
     else {
