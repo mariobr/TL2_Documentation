@@ -9,12 +9,12 @@ A modern, browser-based documentation viewer for the TrustedLicensing documentat
 - 📊 Mermaid diagram rendering
 - 🎨 PlantUML diagram support
 - 📄 PDF document viewing
-- 🔍 Full-text search
+- 🔍 **Full-text search with Lunr.js** (pre-built index)
 
 🎯 **Organized Navigation**
 - 📁 Hierarchical document tree
 - 🏷️ Topic-based categorization
-- 🔎 Real-time filtering
+- 🔎 Real-time search results
 - 📂 Repository filtering
 - 📋 File type filtering
 
@@ -92,9 +92,33 @@ while ($http.IsListening) {
 - Click any document to view
 - Badge shows number of documents per topic
 
+**Search Results Tab:**
+- Full-text search across all documents
+- Shows automatically when you search
+- Results ranked by relevance (0-100% score)
+- Context snippets with highlighted matches
+- Click any result to view the document
+
 ### Search
 
-Type in the search box to filter documents by name or path in real-time.
+**Quick Search:**
+Type in the search box at the top to find documents:
+- Type at least 2 characters to trigger search
+- Results appear automatically in the Search Results tab
+- Search looks through titles, headings, and full content
+- Results ranked by relevance with score percentage
+- Search terms highlighted in yellow
+
+**Building the Search Index:**
+Before first use, build the search index:
+```powershell
+cd TL2_Documentation
+.\build-search-index.ps1
+```
+
+This creates `search-index.json` with all document content indexed. Rebuild after adding or modifying documents.
+
+See [SEARCH_SETUP.md](../SEARCH_SETUP.md) for detailed search documentation.
 
 ### Viewing Documents
 

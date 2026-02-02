@@ -8,6 +8,8 @@ const state = {
     filteredDocs: [],
     topics: {},
     searchTerm: '',
+    searchIndex: null,
+    searchIndexData: [],
     filters: {
         repository: 'all',
         fileType: 'all'
@@ -42,6 +44,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load documents
     await loadDocuments();
     console.log('Documents loaded');
+    
+    // Load search index
+    await loadSearchIndex();
+    console.log('Search index loaded');
     
     // Setup event listeners
     setupEventListeners();
@@ -95,6 +101,136 @@ async function loadDocuments() {
     }
 }
 
+// Load search index
+async function loadSearchIndex() {
+    try {
+        const response = await fetch('../search-index.json');
+        if (!response.ok) {
+            console.warn('Search index not found. Run build-search-index.ps1 to enable search.');
+            return;
+        }
+        
+        const indexData = await response.json();
+        state.searchIndexData = indexData.documents;
+        
+        // Build Lunr index
+        state.searchIndex = lunr(function() {
+            this.ref('id');
+            this.field('title', { boost: 10 });
+            this.field('headings', { boost: 5 });
+            this.field('summary', { boost: 3 });
+            this.field('content');
+            this.field('category', { boost: 2 });
+            
+            indexData.documents.forEach(doc => {
+                this.add(doc);
+            });
+        });
+        
+        console.log(`Search index loaded: ${state.searchIndexData.length} documents indexed`);
+        showSuccess(`Search ready: ${state.searchIndexData.length} documents indexed`);
+    } catch (error) {
+        console.error('Error loading search index:', error);
+        console.warn('Search functionality will be limited. Run build-search-index.ps1 to enable full-text search.');
+    }
+}
+
+// Perform search
+function performSearch(query) {
+    if (!state.searchIndex) {
+        showError('Search index not loaded. Run build-search-index.ps1 first.');
+        return;
+    }
+    
+    if (!query || query.length < 2) {
+        renderSearchResults([]);
+        return;
+    }
+    
+    try {
+        // Perform search
+        const results = state.searchIndex.search(query);
+        
+        // Map results to documents
+        const searchResults = results.map(result => {
+            const doc = state.searchIndexData.find(d => d.id === parseInt(result.ref));
+            return {
+                ...doc,
+                score: result.score,
+                matchData: result.matchData
+            };
+        });
+        
+        console.log(`Search for "${query}" returned ${searchResults.length} results`);
+        renderSearchResults(searchResults, query);
+    } catch (error) {
+        console.error('Search error:', error);
+        showError('Search failed. Try a different query.');
+    }
+}
+
+// Render search results
+function renderSearchResults(results, query = '') {
+    const container = document.getElementById('searchResultsContainer');
+    
+    if (results.length === 0) {
+        container.innerHTML = `
+            <div class="search-empty-state">
+                <div class="search-icon">🔍</div>
+                <p>${query ? `No results found for "${query}"` : 'Enter a search term to find documents'}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="search-results-header">
+            <h3>Search Results</h3>
+            <span class="results-count">${results.length} ${results.length === 1 ? 'result' : 'results'} for "${query}"</span>
+        </div>
+        <div class="search-results-list">
+            ${results.map(result => `
+                <div class="search-result-item" data-path="${result.path}">
+                    <div class="search-result-header">
+                        <h4 class="search-result-title">${highlightText(result.title, query)}</h4>
+                        <span class="search-result-score">${(result.score * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="search-result-meta">
+                        <span class="search-result-category">${result.category}</span>
+                        <span class="search-result-path">${result.path}</span>
+                    </div>
+                    <p class="search-result-summary">${highlightText(result.summary, query)}</p>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    // Add click handlers
+    container.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const path = item.dataset.path;
+            loadDocument(path);
+        });
+    });
+}
+
+// Highlight search terms in text
+function highlightText(text, query) {
+    if (!query || !text) return text;
+    
+    const terms = query.toLowerCase().split(/\s+/);
+    let highlightedText = text;
+    
+    terms.forEach(term => {
+        if (term.length >= 2) {
+            const regex = new RegExp(`(${term})`, 'gi');
+            highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
+        }
+    });
+    
+    return highlightedText;
+}
+
 // Extract topics from document paths
 function extractTopics() {
     state.topics = {};
@@ -131,8 +267,25 @@ function setupEventListeners() {
     
     // Search input
     const searchInput = document.getElementById('searchInput');
+    let searchTimeout;
     searchInput.addEventListener('input', (e) => {
         state.searchTerm = e.target.value.toLowerCase();
+        
+        // Debounce search
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            if (state.searchTerm.length >= 2) {
+                performSearch(state.searchTerm);
+                switchTab('search');
+            } else {
+                // Clear search results if search term is too short
+                if (state.searchTerm.length === 0) {
+                    switchTab('hierarchy');
+                }
+            }
+        }, 300);
+        
+        // Also apply filters for hierarchy view
         applyFilters();
     });
     

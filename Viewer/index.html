@@ -16,6 +16,9 @@
     <!-- PlantUML rendering -->
     <script src="https://cdn.jsdelivr.net/npm/plantuml-encoder@1.4.0/dist/plantuml-encoder.min.js"></script>
     
+    <!-- Full-text search -->
+    <script src="https://cdn.jsdelivr.net/npm/lunr@2.3.9/lunr.min.js"></script>
+    
     <!-- Syntax highlighting for code blocks -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -52,6 +55,9 @@
                     <button class="tab-button" data-tab="topics">
                         🏷️ Topics
                     </button>
+                    <button class="tab-button" data-tab="search">
+                        🔍 Search Results
+                    </button>
                 </div>
 
                 <!-- Hierarchy Tab Content -->
@@ -74,6 +80,16 @@
                 <!-- Topics Tab Content -->
                 <div id="topicsTab" class="tab-content">
                     <div class="topics-container" id="topicsContainer"></div>
+                </div>
+
+                <!-- Search Results Tab Content -->
+                <div id="searchTab" class="tab-content">
+                    <div id="searchResultsContainer" class="search-results-container">
+                        <div class="search-empty-state">
+                            <div class="search-icon">🔍</div>
+                            <p>Enter a search term to find documents</p>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
