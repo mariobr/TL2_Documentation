@@ -19,10 +19,10 @@ $docDirectories = @(
 # Initialize index data structure
 $indexData = @{
     documents = @()
-    metadata = @{
-        buildDate = (Get-Date).ToString("o")
+    metadata  = @{
+        buildDate      = (Get-Date).ToString("o")
         totalDocuments = 0
-        version = "1.1"
+        version        = "1.1"
     }
 }
 
@@ -41,7 +41,7 @@ function Extract-Headings {
             $text = $matches[2].Trim()
             $headings += @{
                 level = $level
-                text = $text
+                text  = $text
             }
         }
     }
@@ -186,26 +186,29 @@ foreach ($dir in $docDirectories) {
             $category = "Documentation"
             if ($relativePath -match '^Generated/') {
                 $category = "Generated"
-            } elseif ($relativePath -match '^TLCloud/') {
+            }
+            elseif ($relativePath -match '^TLCloud/') {
                 $category = "TLCloud"
-            } elseif ($relativePath -match '^TL2/') {
+            }
+            elseif ($relativePath -match '^TL2/') {
                 $category = "TL2"
-            } elseif ($relativePath -match '^TL2_dotnet/') {
+            }
+            elseif ($relativePath -match '^TL2_dotnet/') {
                 $category = "TL2_dotnet"
             }
             
             # Add to index
             $doc = @{
-                id = $docId
-                title = $title
-                path = $relativePath
-                category = $category
-                summary = $summary
-                headings = $headingText
-                content = $cleanedContent
+                id          = $docId
+                title       = $title
+                path        = $relativePath
+                category    = $category
+                summary     = $summary
+                headings    = $headingText
+                content     = $cleanedContent
                 searchTerms = $searchTerms
-                size = $file.Length
-                modified = $file.LastWriteTime.ToString("o")
+                size        = $file.Length
+                modified    = $file.LastWriteTime.ToString("o")
             }
             
             $indexData.documents += $doc
