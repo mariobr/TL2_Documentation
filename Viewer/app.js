@@ -120,6 +120,7 @@ async function loadSearchIndex() {
             this.field('headings', { boost: 5 });
             this.field('summary', { boost: 3 });
             this.field('content');
+            this.field('searchTerms', { boost: 6 });
             this.field('category', { boost: 2 });
             
             indexData.documents.forEach(doc => {
@@ -148,8 +149,32 @@ function performSearch(query) {
     }
     
     try {
-        // Perform search
-        const results = state.searchIndex.search(query);
+        // Perform primary search
+        let results = state.searchIndex.search(query);
+
+        // Fallback query for technical terms / prefixes when strict parsing returns no hits
+        if (results.length === 0) {
+            const terms = lunr.tokenizer(query)
+                .map(token => token.toString())
+                .filter(term => term.length >= 2);
+
+            if (terms.length > 0) {
+                results = state.searchIndex.query(q => {
+                    terms.forEach(term => {
+                        q.term(term, {
+                            presence: lunr.Query.presence.OPTIONAL
+                        });
+
+                        if (term.length >= 4) {
+                            q.term(term, {
+                                wildcard: lunr.Query.wildcard.TRAILING,
+                                presence: lunr.Query.presence.OPTIONAL
+                            });
+                        }
+                    });
+                });
+            }
+        }
         
         // Map results to documents
         const searchResults = results.map(result => {

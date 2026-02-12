@@ -22,7 +22,7 @@ $indexData = @{
     metadata = @{
         buildDate = (Get-Date).ToString("o")
         totalDocuments = 0
-        version = "1.0"
+        version = "1.1"
     }
 }
 
@@ -75,11 +75,11 @@ function Extract-Summary {
 function Clean-MarkdownContent {
     param([string]$Content)
     
-    # Remove code blocks
-    $cleaned = $Content -replace '(?s)```.*?```', ''
+    # Keep code block content but remove fence markers
+    $cleaned = $Content -replace '(?m)^```.*$', ''
     
-    # Remove inline code
-    $cleaned = $cleaned -replace '`[^`]+`', ''
+    # Keep inline code content but remove backticks
+    $cleaned = $cleaned -replace '`([^`]+)`', '$1'
     
     # Remove HTML tags
     $cleaned = $cleaned -replace '<[^>]+>', ''
@@ -93,10 +93,46 @@ function Clean-MarkdownContent {
     # Remove markdown formatting
     $cleaned = $cleaned -replace '[*_~]', ''
     
+    # Normalize separators often found in technical identifiers
+    $cleaned = $cleaned -replace '[\./\\:_-]', ' '
+    
+    # Add spacing for camelCase and PascalCase boundaries
+    $cleaned = $cleaned -replace '([a-z])([A-Z])', '$1 $2'
+    
     # Remove extra whitespace
     $cleaned = $cleaned -replace '\s+', ' '
     
     return $cleaned.Trim()
+}
+
+# Function to extract additional technical search terms
+function Extract-SearchTerms {
+    param(
+        [string]$Title,
+        [string]$Headings,
+        [string]$Content,
+        [string]$RelativePath
+    )
+
+    $combined = "$Title $Headings $Content $RelativePath"
+
+    # Keep alphanumeric identifiers and common separators for token splitting
+    $normalized = $combined -replace '[^a-zA-Z0-9_\-\./\\ ]', ' '
+
+    # Add spaces for camelCase/PascalCase boundaries
+    $normalized = $normalized -replace '([a-z])([A-Z])', '$1 $2'
+
+    # Convert separators to spaces
+    $normalized = $normalized -replace '[\./\\:_-]', ' '
+
+    $tokens = $normalized -split '\s+' | Where-Object { $_.Length -ge 3 }
+
+    # Add compact (separator-free) variant for exact identifier lookup (e.g., SecretKey)
+    $compact = ($combined -replace '[^a-zA-Z0-9]', ' ')
+    $compactTokens = $compact -split '\s+' | Where-Object { $_.Length -ge 3 }
+
+    $allTokens = @($tokens + $compactTokens | ForEach-Object { $_.ToLowerInvariant() }) | Sort-Object -Unique
+    return ($allTokens -join ' ')
 }
 
 # Scan each directory
@@ -142,6 +178,9 @@ foreach ($dir in $docDirectories) {
             
             # Clean content for full-text search
             $cleanedContent = Clean-MarkdownContent -Content $content
+
+            # Extract deep technical terms for better searchability
+            $searchTerms = Extract-SearchTerms -Title $title -Headings $headingText -Content $cleanedContent -RelativePath $relativePath
             
             # Determine category based on path
             $category = "Documentation"
@@ -164,6 +203,7 @@ foreach ($dir in $docDirectories) {
                 summary = $summary
                 headings = $headingText
                 content = $cleanedContent
+                searchTerms = $searchTerms
                 size = $file.Length
                 modified = $file.LastWriteTime.ToString("o")
             }
